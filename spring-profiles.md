@@ -341,7 +341,7 @@ public class TomcatAndMySQLDatasourceConfig implemnets DatasourceConfig {
 }
 ```
 
-Como mostra o exemplo, **somente se os perfis *tomcat* e *mysql* estiverem ativos, uma instância `TomcatAndMySQLDatasourceConfig` será o *bean* `DatasourceConfig` no *app***.
+Como mostra o exemplo, **somente se os perfis *tomcat* e *mysql* estiverem ativos, uma instância `TomcatAndMySQLDatasourceConfig` será o *bean* `DatasourceCOnfig` no *app***.
 
 Em seguida, criamos um teste para verificar isso:
 
@@ -502,4 +502,4 @@ spring.profiles.group.production=proddb,prodquartz
 
 ## Fonte
 
-- Artigo: [Baeldung](https://www.baeldung.com/spring-profiles)
+- Artigo: [Spring Profiles](https://www.baeldung.com/spring-profiles)
