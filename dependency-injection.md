@@ -753,4 +753,4 @@ Devemos evitar colocar a classe `@Configuration` no *pacote padrão* (ou seja, n
 
 ### Fonte:
 
-- Artigle: (Spring Component Scanning)[https://www.baeldung.com/spring-component-scanning]
+- Artigo: (Spring Component Scanning)[https://www.baeldung.com/spring-component-scanning]
