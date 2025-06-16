@@ -525,3 +525,232 @@ No primeiro acesso, os *beans* com escopo `WebSocket` são armazenados nos atrib
 ### Fonte:
 
 - Artigo: [Quick Guide to Spring Bean Scopes](https://www.baeldung.com/spring-bean-scopes)
+
+## Escaneamento de componentes *Spring*
+
+### 1. Visão Geral
+
+Neste tutorial, abordaremos o *escanemaneto de componentes* do *Spring*. Ao trabalhar com o *Spring*, podemos anotar classes para transformá-las em *Spring beans*. Além disso, **podemos informar ao *Spring* onde procurar por essas classes anotadas**, já que nem todas precisam se tornar *beans* nesta execução específica.
+
+### 2. `@ComponentScan` sem Argumentos
+
+#### 2.1. Usando `@ComponentScan` em uma Aplicação *Spring*
+
+Com o *Spring*, **usamos a anotação `@ComponentScan` junto com a anotação `@Configuration` para especificar os `packages` que queremos escanear.** `@ComponentScan` sem argumentos diz ao *Spring* para escanear o `package` atual e todos os seus `subpackages`.
+
+Digamos que temos a seguinte `@Configuration` no *package* `com.bealdung.componentscan.springapp`:
+
+```java
+@Configuration
+@ComponentScan
+public class SpringComponentScanApp {
+    private static ApplicationContext applicationContext;
+
+    @Bean
+    public ExampleBean exampleBean() {
+        return new ExampleBean();
+    }
+
+    public static void main(String[] args) {
+        applicationContext = new AnnotationConfigApplicationContext(SpringComponentScanApp.class);
+
+        for (String beanName = applicationContext.getBeanDefinitionNames()) {
+            System.out.println(beanName);
+        }
+    }
+}
+```
+
+Além disso, temos os componentes `Cat` e `Dog` no *package* `com.bealdung.componentscan.springapp.animals`:
+
+```java
+package com.bealdung.componentscan.springapp.animals;
+
+// ...
+@Component
+public class Cat {}
+```
+
+```java
+package com.baeldung.componentscan.springapp.animals;
+
+// ...
+@Component
+public class Dog {}
+```
+
+Por fim, temos o componente `Rose` no *package* `com.baeldung.componentscan.springapp.flowers`:
+
+```java
+package com.baeldung.componentscan.springapp.flowers;
+
+// ...
+@Component
+public class Rose {}
+```
+
+A saída do método `main()` conterá todos os *beans* do *package* `com.baeldung.componentscan.springapp` e seus *subpackages*:
+
+```
+springComponentScanApp
+cat
+dog
+rose
+exampleBean
+```
+
+Observe que a classe principal do aplicativo também é um bean, pois é anotada com `@Configuration`, que é um `@Component`.
+
+*Devemos também observar que a classe principal do aplicativo e a classe de configuração não são necessariamente as mesmas.* Se forem diferentes, não importa onde colocamos a classe principal do aplicativo. **Apenas a localização da classe de configuração importa, pois o escaneamento de componentes começa a partir do seu pacote (*package*) por padrão.**
+
+Por fim, observe que em nosso exemplo, `@ComponentScan` é equivalente a:
+
+```java
+@ComponentScan(basePackages = "com.baeldiung.componentscan.springapp")
+```
+
+#### 2.2. Usando `@ComponentScan` em um aplicativo *Spring Boot*
+
+O truque do *Spring Boot* é que muitas coisas acontecem implicitamente. Usamos a anotação `@SpringBootApplication`, *mas ela é uma combinação de três anotações*:
+
+```java
+@Configuration
+@EnableAutoConfiguration
+@ComponentScan
+```
+
+Vamos criar uma estrutura semelhante no pacote `com.baeldung.componentscan.springapp`. Desta vez, a aplicação principal será:
+
+```java
+package com.baeldung.componentscan.springbootapp;
+
+// ...
+public class SpringBootComponentScanApp {
+    private static ApplicationContext applicationContext;
+
+    @Bean
+    public ExampleBean exampleBean() {
+        return new ExampleBean();
+    }
+
+    public static void main(String[] args) {
+        applicationContext = SpringApplication.run(SpringBootComponentScanApp.class, args);
+
+        checkBeansPresence(
+            "cat", "dog", "rose", "exampleBean", "springBootComponentScanApp"
+        );
+    }
+
+    private static void checkBeansPresence(String... beans) {
+        for (String beanName : beans) {
+            System.out.println(
+                "Is " 
+                + beanName
+                + " in ApplicationContext: "
+                + applicationContext.containsBeans(beanName)
+            );
+        }
+    }
+}
+```
+
+Todos os outros pacotes e classes permanecem os mesmos, vamos apenas copiá-los para o pacote `com.baeldung.componentscan.springbootapp` próximo.
+
+O *Spring Boot* verifica os pacotes de forma semelhante ao nosso exemplo anterior.
+
+```
+Is cat in ApplicationContext: true
+Is dog in ApplicationContext: true
+Is rose in ApplicationContext: true
+Is exampleBean in ApplicationContext: true
+Is springBootComponentScanApp in ApplicationContext: true
+```
+
+O motivo pelo qual estamos apenas verificando a existência dos beans em nosso segundo exemplo (em vez de imprimir todos os beans) é que a saída seria muito grande.
+
+Isso ocorre por causa da anotação implícita `@EnableAutoConfiguration`, que faz o *Spring Boot* criar muitos *beans* automaticamente, contando com as dependências do arquivo `pom.xml`.
+
+### 3. `@ComponentScan` com Argumentos
+
+Agora, vamos personalizar os caminhos para a varredura. Por exemplo, digamos que queremos excluir o *bean* `Rose`.
+
+#### 3.1. `@ComponentScan` para Pacotes Específicos
+
+Podemos fazer isso de algumas maneiras diferentes. Primeiro, podemos alterar o pacote base:
+
+```java
+@ComponentScan(basePackages = "com.baeldung.componentscan.springapp.animals")
+@Configuration
+public class SpringComponentScanApp {
+    // ...
+}
+```
+
+A saída será:
+
+```springComponentScanApp
+cat
+dog
+exampleBean
+```
+
+O que está por trás disso?
+
+- `springComponentScanApp` é criado porque é uma configuração passada como um argumento para `AnnotationConfigApplicationContext`
+- `exampleBean` é um bean configurado dentro da configuração
+- `cat` e `dog` estão no pacote `com.baeldung.componentscan.springapp.animals` específicado
+
+Todas as personalizações listadas acima também são aplicáveis ao *Spring Boot*. Podemos usar `@ComponentScan` junto com `@SpringBootApplication` e o resultado será o mesmo:
+
+```java
+@SpringBootApplication
+@ComponentScan(basePackages = "com.baeldung.componentscan.springbootapp.animals")
+```
+
+#### 3.2. `@ComponentScan` com Vários Pacotes
+
+O *Spring* oferece uma maneira conveniente de especificar vários nomes de pacotes. Para isso, precisamos usar um `array` de `strings`.
+
+Cada sequência do `array` denota um nome de *pacote*:
+
+```java
+@ComponetnScan(basePackages = {"com.baeldung.compontentscan.apringapp.animals", "com.baeldung.componentscan.springapp.flowers"})
+```
+
+Alternativamente, *desde o **Spring 4.1.1***, *podemos usar uma vírgula, um ponto e vírgula ou um espaço para separar a lista de pacotes*:
+
+```java
+@ComponentScan(basePackages = "com.baeldung.componentscan.springapp.animals;com.baeldung.componentscan.springapp.flowers")
+@ComponentScan(basePackages = "com.baeldung.componentscan.springapp.animals,com.baeldung.componentscan.springapp.flowers")
+@ComponentScan(basePackages = "com.baeldung.componentscan.springapp.animals com.baeldung.componentscan.springapp.flowers")
+```
+
+#### 3.3. `@ComponentScan` com Exclusões
+
+Outra maneira é usar um filtro especificando o padrão para as classes excluídas:
+
+```java
+@ComponentScan(
+    excludeFilters =
+        @ComponentScan.Filter(type=FilterType.REGEX,
+        pattern="com\\.baeldung\\.componentscan\\.springapp\\.flowers\\..*"
+    )
+)
+```
+
+Também podemos escolher um tipo de filtro diferente, pois *a anotação suporta várias opções flexíveis para filtrar as classes escaneadas*:
+
+```java
+@ComponentScan(
+    excludeFilters =
+        @ComponentScan.Filter(type = FilterType.ASSIGNABLE_TYPE, value = Rose.class)
+)
+```
+
+### 4. O Pacote Padrão
+
+Devemos evitar colocar a classe `@Configuration` no *pacote padrão* (ou seja, não especificando o pacote). Se fizermos isso, *o **Spring** verificará todas as classes em todos os `jars` de um `classpath`, o que causa erros e o aplicativo provavelmente não iniciará*.
+
+### Fonte:
+
+- Artigle: (Spring Component Scanning)[https://www.baeldung.com/spring-component-scanning]
