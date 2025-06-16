@@ -230,3 +230,298 @@ Consequentemente, *o bean `item1`* só será inicializado quando for solicitado 
 ### Fonte:
 
 - Artigo: [Inversion of Control and Dependency Injection with Spring](https://www.baeldung.com/inversion-control-and-dependency-injection-in-spring)
+
+## Guia Rápido para Escopos *Spring Bean*
+
+### 1. Visão Geral
+
+O escopo de um *bean* define o *ciclo de vida* e a *visibilidade* desse *bean* nos contextos em que o usamos.
+
+A versão mais recente do *Spring Boot* define 6 tipos de escopo:
+
+- *singleton*
+- *prototype*
+- *request*
+- *session*
+- *application*
+- *websocket*
+
+*Os últimos quatro escopos mencionados, request, session, application e websocket, estão disponíveis somente em aplicativos com suporte web.*
+
+### 2. Escopo *Singleton*
+
+Quando definimos um *bean* com o escopo *singleton*, contêiner cria uma única instância desse *bean*; todas as requisições para esse nome de *bean* retornarão o mesmo objeto, que é armazenado em cache. *Quaisquer modificações no objeto serão refletidas em todas as referências ao bean.* Este escopo é o valor padrão se nenhum outro escopo for especificado.
+
+Vamos criar uma entidade `Person` para exemplificar o conteito de escopos:
+
+```java
+public class Person {
+    private String name;
+
+    // standard contructor, getters and setters
+}
+```
+
+Depois, definimos o *bean* com o escopo `singleton` usando a anotação `@Scope`:
+
+```java
+@Bean
+@Scope("singleton")
+public Person personSingleton() {
+    return new Person();
+}
+```
+
+Também podemos usar uma constante em vez do valor `String` da seguinte forma:
+
+```java
+@Scope(value = ConfigurableBeanFactory.SCOPE_SINGLETON)
+```
+
+Agora podemos prosseguir para escrever um teste que mostra que dois objetos que fazem referência ao mesmo *bean* terão os mesmos valores, *mesmo que apenas um deles altere seu estado, já que ambos estão referenciando a mesma instância de bean.*
+
+```java
+private static final String NAME = "John Smith";
+
+@Test
+public void givenSingletonScope_whenSetName_thenEqualNames() {
+    ApplicationContext applicationContext = new ClassPathXmlApplicationContext("scopes.xml");
+
+    Person personSingletonA = (Person) applicationContext.getBean("personSingleton");
+    Person personSingletonB = (Person) applicationContext.getBean("personSingleton");
+
+    personSingleTonA.setName(NAME);
+    Assert.assertEquals(NAME, personSingletonB.getName());
+
+    ((AbstractApplicationContext) applicationContext).close();
+}
+```
+
+O arquivo `scopes.xml` deve conter as definições `XML` dos *beans* usados:
+
+```xml
+<?xml version="1.0" enconding="UTF-8"?>
+<beans 
+    xmlns="http://www.springframework.org/schema/beans"
+    xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+    xsi:schemaLocation="http://www.springframework.org/schema/beans http://www.springframework.org/schema/beans/spring-beans.xsd"   
+>
+    <bean id="personSingleton" class="org.bealdiung.scopes.Person" scope="singleton"/>
+</beans>
+```
+
+### 3. Escopo *Prototype*
+
+Um *bean* com o escopo *prototype* retornará uma instância diferente sempre que for solicitado do contêiner. Isso é definido definindo o valor `prototype` para a anotação `@Scope` na definição do *bean*:
+
+```java
+@Bean
+@Scope("prototype")
+public Person personPrototype() {
+    return new Person();
+}
+```
+
+Podemos usar uma constatnte:
+
+```java
+@Scope(value = ConfigurableBeanFactore.SCOPE_PROTOTYPE)
+```
+
+Escreveremos um teste semelhante ao anterior, que mostra dois objetos solicitando o mesmo nome de *bean* com o escopo de `prototype`. Eles terão estados diferentes, *pois não estão mais se referindo à mesma instância de bean*:
+
+```java
+private static final String NAME = "John Smith";
+private static final String NAME_OTHER = "Anna Jones";
+
+@Test
+public void givenPrototypeScope_whenSetNames_thenDifferentNames() {
+    ApplicationContexxt applicationContext = new ClassPathApplicationContext("scopes.xml");
+
+    Person personPrototypeA = (Person) applicationContext.getBean("personPrototype");
+    Person personPrototypeB = (Person) applicationContext.getBean("personPrototype");
+
+    personPrototypeA.setName(NAME);
+    personPrototypeB.setName(NAME_OTHER);
+
+    Assert.assertEquals(NAME, personPrototypeA.getName());
+    Assert.assertEquals(NAME_OTHER, personPrototypeB.getName());
+
+    ((AbstractApplicationContext) applicationContext).close();
+}
+```
+
+O arquivo `scopes.xml` é semelhante ao apresentado na seção anterior, ao adicionar a *definição xml* para o *bean* com o escopo de `prototype`:
+
+```xml
+<bean id="personPrototype" class="org.bealdung.scopes.Person" scope="prototype"/>
+```
+
+### 4. Escopos com reconhecimento da Web
+
+Como mencionado anteriormente, existem quatro escopos adicionais que estão disponíveis apenas em um contexto de aplicativo com suporte à web.
+
+O escopo `request` cria uma instância de *bean* para uma única solicitação `HTTP`, enquanto o escopo `session` cria uma instância de *bean* para o ciclo de vida de um `ServletContext`, e o escopo de `websocket` cria para uma sessão específica do `WebSocket`.
+
+Criamos uma classe para usar na *instanciação dos beans*:
+
+```java
+public class HelloMessageGenerator {
+    private String message;
+
+    // standard getter and setter
+}
+```
+
+#### 4.1.1 Escopo de `request`
+
+Podemos definir o bean com o escopo de `request` usando a anotação `@Scope`:
+
+```java
+@Bean
+@Scope(value = WebApplicationContext.SCOPE_REQUEST, proxyMode = ScopedProxyMode.TARGET_CLASS);
+public HelloMessageGenerator requestScopedBean() {
+    return new HelloMessageGenerator();
+}
+```
+
+O atributo `proxyMode` é necessário porque, no momento da instanciação do *contexto da aplicação web*, não há nenhuma requisição ativa. O *Spring* cria um *proxy* para ser injetado como dependência e instancia o *bean* de destino quando necessário em uma requisição.
+
+Também podemos usar uma anotação composta `@RequestScope` que atua como um atalho para a definição acima:
+
+```java
+@Bean
+@RequestScope
+public HelloMessageGenerator requestScopedBean() {
+    return new HelloMessageGenerator();
+}
+```
+
+Em seguida, podemos definir um `controller` que tenha uma referência injetada ao `requestScopedBean`. Precisamos acessar a mesma solicitação duas vezes para testar os escopos específicos da web.
+
+Se exibirmos a mensagem sempre que a solicitação for executada, podemos ver que o valor é redefinido para *nulo*, mesmo que seja alterado posteriormente no método. Isso ocorre porque uma instância de *bean* diferente é retornada para cada solicitação.
+
+```java
+@Controller
+public class ScopeController {
+    @Resource(name = "requestScopedBean")
+    HelloMessageGenerator requestScopedBean;
+
+    @RequestMapping("/scopes/request")
+    public String getRequestScopeMessage(final Model model) {
+        model.addAttribute("previousMessage", requestScopedBean.getMessage());
+        requestScopedBean.setMessage("Good morning!");
+        model.addAttribute("currentMessage", requestScopedBean.getMessage());
+
+        return "scopesExample";
+    }
+}
+```
+
+#### 4.2. Escopo de `session`
+
+Podemos definir o *bean* com o escopo de `session` de maneira semelhante:
+
+```java
+@Bean
+@Scope(value = WebApplicationContext.SCOPE_SESSION, proxyMode = ScopedProxyMode.TARGET_CLASS)
+public HelloMessageGenerator sessionScopedBean() {
+    return new HelloMessageGenerator();
+}
+```
+
+Há também uma *anotação composta* dedicada que podemos usar para simplificar a definição do *bean*:
+
+```java
+@Bean
+@SessionScope
+public HelloMessageGenerator sessionScopedBean() {
+    return new HelloMessageGenerator();
+}
+```
+
+Em seguida, definimos um `controller` com uma referência ao `sessionScopedBean`. *Novamente, precisamos executar duas requisições para mostrar que o valor do campo de mensagem é o mesmo para a sessão.*
+
+Quando a solicitação é feita pela primeira vez, o valor `message` é *nulo*. *No entanto, uma vez alterado, esse valor é mantido para solicitações subsequentes, pois a mesma instância do **bean** é retornada durante toda a sessão.*
+
+```java
+@Controller
+public class ScopesController {
+    @Resource(name = "sessionScopedBean")
+    HelloMessageGenerator sessionScopedBean;
+
+    @RequestMapping("/scopes/session")
+    public String getSessionScopeMessage(final Model model) {
+        model.addAttribute("previousMessage", sessionScopedBean.getMessage());
+        sessionScopedBean.setMessage("Good afternoon!");
+        model.addAttribute("currentMessage", sessionScopedBean.getMessage());
+
+        return "scopesExample";
+    }
+}
+```
+
+#### 4.3. Escopo de `application`
+
+O escopo de `application` cria instância do *bean* para o ciclo de vida de um `ServletContext`.
+
+Isso é semelhante ao escopo `singleton`, mas há uma *diferença muito importante* em relação ao escopo do *bean*.
+
+Quando os *beans* têm o escopo `application`, *a mesma instância do **bean** é compartilhada entre vários aplicativos baseados em `servlet` em execução no mesmo `ServletContext`, enquanto os **beans** com escopo `singleton` têm escopo para apenas um único contexto do aplicativo.*
+
+```java
+@Bean
+@Scope(value = WebApplicationContext.SCOPE_APPLICATION, proxyMode = ScopedProxyMode.TARGET_CLASS)
+public HelloMessageGenerator applicationScopedBean() {
+    return new HelloMessageGenerator();
+}
+```
+
+Analogamente aos escopos de `request` e `session`, podemos usar uma versão mais curta:
+
+```java
+@Bean
+@ApplicationScope
+public HelloMessageGenerator applicationScopedBean() {
+    return new HelloMessageGenerator();
+}
+```
+
+Criamos um `controller` que faça referência a este *bean*:
+
+```java
+@Controller
+public class ScopesController {
+    @Resource(name = "applicationScopedBean")
+    HelloMessageGenerator applicationScopedBean;
+
+    @RequestMapping("/scopes/application")
+    public String getApplitationScopeMessage(final Model model) {
+        model.addAttribute("previousMessage", applicationScopedBean.getMessage());
+        applicationScopedBean.setMessage("Good afternoon!");
+        model.addAttribute("currentMessage", applicationScopedBean.getMessage());
+
+        return "scopesExample";
+    }
+}
+```
+
+Uma vez definido no `applicationScopedBean`, o valor `message` será retido para todas as solicitações e sessões subsequentes e até mesmo para diferentes aplicativos `servlet` que acessarão este *bean*, desde que ele esteja sendo executado no mesmo `ServletContext`.
+
+#### 4.4. Escope de `WebSocket`
+
+Por fim, vamos criar o *bean* com o escopo `websocket`:
+
+```java
+@Bean
+@Scope(scopeName = "websocket", proxyMode = ScopedProxyMode.TARGET_CLASS)
+public HelloMessageGenerator websocketScopedBean() {
+    return new HelloMessageGenerator();
+}
+```
+
+No primeiro acesso, os *beans* com escopo `WebSocket` são armazenados nos atributos de sessão do `WebSocket`. A mesma instância do *bean* é retornada sempre que o *bean* é acessado durante toda a sessão do `WebSocket`.
+
+### Fonte:
+
+- Artigo: [Quick Guide to Spring Bean Scopes](https://www.baeldung.com/spring-bean-scopes)
