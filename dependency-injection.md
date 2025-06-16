@@ -754,3 +754,95 @@ Devemos evitar colocar a classe `@Configuration` no *pacote padrão* (ou seja, n
 ### Fonte:
 
 - Artigo: (Spring Component Scanning)[https://www.baeldung.com/spring-component-scanning]
+
+## *Injeção de Dependências* de Construtor no *Spring Boot*
+
+### 1. Introdução
+
+Provavelmente um dos princípios do desenvolvimento mais importantes do design de software moderno é a *Injeção de Dependêcnia (**DI**)*, que naturalmente decorre de outro princípio extremamente importante: a *Modularidade*.
+
+Este tutorial rápido explorará um tipo específico de técnica de *DI* no *Spring Boot* chamada de *Injeção de Dependência Baseada em Construtor*, que, em termos simples, significa que passamos os componentes necessários para uma classe no momento de instanciação.
+
+Para começar, precisamos importar a dependência `spring-boot-starter-web` em nosso `pom.xml`:
+
+```xml
+<dependency>
+    <groupId>org.springframework.boot</groupId>
+    <artifactId>spring-boot-starter-web</artifactId>
+</dependency>
+```
+
+Em seguida, precisamos configurar um arquivo de configuração. Este arquivo pode ser um arquivo `POJO` ou `XML`, conforme a preferência.
+
+### 2. Configuração Baseada em Anotação
+
+Os arquivos de configuração *Java* são semelhantes aos objetos *Java* com algumas anotações adicionais:
+
+```java
+@Configuration
+@ComponentScan("com.baeldung.constructordi")
+public class Config {
+    @Bean
+    public Engine engine() {
+        return new Engine("v8", 5);
+    }
+
+    @Bean
+    public Transmission transmission() {
+        return new Transmission("sliding");
+    }
+}
+```
+
+Aqui, estamos usando anotações para notificar o tempo de execução do *Spring* de que esta classe fornece *definições de bean* (anotação `@Bean`) e que o pacote (`package`) `com.baeldung.spring` precisa executar um escaneamento de contexto em busca de *beans* adicionais. Em seguida, definimos uma classe `Car`:
+
+```java
+@Component
+public class Car {
+    @Autowired
+    public Car(Engine engine, Transmission transmission) {
+        this.engine = engine;
+        this.transmission = transmission;
+    }
+}
+```
+
+O *Spring* encontrará nossa classe `Car` ao fazer um escaneamento de *package* e inicializará sua instância chamando o construtor anotado `@Autowired`.
+
+Chamando os métodos anotados `@Bean` da classe `Config`, obteremos instâncias de `Engine` e `Transmission`. Por fim, precisamos inicializar um `ApplicationContext` usando nossa configuração `POJO`.
+
+```java
+ApplicationContext context = new AnnotationConfigApplicationCOntext(Config.class);
+Car car = context.getBean(Car.class);
+```
+
+### 3. Injeção de Construtor Implícito
+
+*Classes com um único construtor podem omitir a anotação `@Autowired`.* Isso é uma pequena vantagem prática e uma remoção de clichês.
+
+Além disso, a *partir da versão **4.3***, *podemos aproveitar a injeção baseada em construtor em classes anotadas com `@Configuration`*. Além disso, *se uma classe tiver apenas um construtor, também podemos omitir a anotação `@Autowired`*.
+
+### 4. Prós e Contras
+
+*A injeção de construtor tem algumas vantagens em comparação à injeção de campo.*
+
+**O primeiro benefício é a testabilidade.** Suponha que vamos testar a unidade de um *bean* *Spring* que usa injeção de campo:
+
+```java
+public class UserService {
+    @Autowired
+    private UserRepository userRepository;
+}
+```
+
+Durante a construção de uma instância de `UserService`, não podemos inicializar o estado `userRepository`. A única maneira de fazer isso é por meio da **API de Reflexão**, *que quebra* completamente o encapsulamento. Além disso, o código resultante será menos seguro em comparação com uma simples chamada de construtor.
+
+Além disso, **com a injeção de campo, não podemos impor invariantes em nível de classe**, *então é possível* ter uma instância de `UserService` sem um `userRepository` inicializado corretamente. Portanto, podemos encontrar `NullPointerExceptions` aleatórias aqui e ali. Além disso, com a injeção de construtor, é mais fácil construir componentes imutáveis.
+
+Além disso, *usar construtores para criar instâncias de objetos é mais natural do ponto de vista da **POO***.
+
+Por outro lado, a principal desvantagem da *injeção de construtor* é sua verbosidade, especialmente quando um *bean* possui poucas dependências. Ás vezes, pode ser uma *bênção disfarçada*, pois podemos nos esforçar mais para manter o número de dependências mínimo.
+
+### Fonte:
+
+- Artigo: [Constructor Dependency Injection in Spring](https://www.baeldung.com/constructor-injection-in-spring)
