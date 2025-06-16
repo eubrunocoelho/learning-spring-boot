@@ -163,9 +163,9 @@ Essa abordagem pode parercer mais simples e limpa, *mas não recomendamos usá-l
 
 Existem quatro modos de *autowiring* de um *bean* usando uma configuração `XML`:
 
-- ***no**:** O valor padrão - isso significa que nenhuma conexão automática é usada para o *bean* e temos que nomear explicitamente as dependências.
-- ***byName**:** A conexão automática é feita com base no nome da propriedade, portanto, o *Spring Boot* procurará um *bean* com o mesmo nome da propriedade que precisa ser definida.
-- ***byType**:** Semlhante à *autowiring ByName*, mas com base no tipo da propriedade. Isso significa que o *Spring Boot* procurará um *bean* com o mesmo tipo da propriedade para definir. Se houver *mais de um bean* desse tipo, o framework *lançará uma exceção*.
+- ***no*:** O valor padrão - isso significa que nenhuma conexão automática é usada para o *bean* e temos que nomear explicitamente as dependências.
+- ***byName*:** A conexão automática é feita com base no nome da propriedade, portanto, o *Spring Boot* procurará um *bean* com o mesmo nome da propriedade que precisa ser definida.
+- ***byType*:** Semlhante à *autowiring ByName*, mas com base no tipo da propriedade. Isso significa que o *Spring Boot* procurará um *bean* com o mesmo tipo da propriedade para definir. Se houver *mais de um bean* desse tipo, o framework *lançará uma exceção*.
 - ***constructor*:** A conexão automática é feita com base nos argumentos do construtor, o que significa que o Spring Boot procurará por beans com o mesmo tipo de argumentos do construtor.
 
 Por exemplo, vamos conectar *automaticamente o bean* de `item` definido acima por tipo no *bean* de `store`:
