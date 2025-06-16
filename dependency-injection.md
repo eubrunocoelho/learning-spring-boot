@@ -74,7 +74,7 @@ E aqui está um exemplo de instanciação manual de um contêiner usando `Annota
 AnnotationConfigApplicationContext annotationContext = new AnnotationConfigApplicationContext();
 ```
 
-Ao criar uma instância de `AnnotationConfigApplicationContext` e fornecer a ela uma ou mais classes de configuração, ela verifica essas classes em busca de anotações `@Bean` e outras anotações relevantes. Em seguida, *ele inicializa e **gerencia os beans** definidos nessas classes, configurando suas dependências e gerenciado seu ciclo de vida.*
+Ao criar uma instância de `AnnotationConfigApplicationContext` e fornecer a ela uma ou mais classes de configuração, ela verifica essas classes em busca de anotações `@Bean` e outras anotações relevantes. Em seguida, *ele **inicializa** e **gerencia os beans** definidos nessas classes, configurando suas dependências e gerenciado seu ciclo de vida.*
 
 **A injeção de dependência do Spring Boot pode ser feita por meio de *construtores, setters ou campos*.**
 
