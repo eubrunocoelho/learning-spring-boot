@@ -1017,3 +1017,81 @@ Para resumir, *em vez da injeção de campo*, poderiamos usar *injeção de cons
 ### Fonte:
 
 - Artigo: [Why Is Field Injection Not Recommended?](https://www.baeldung.com/java-spring-field-injection-cons)
+
+## Injetando um valor em uma *campo estático* no Spring
+
+### 1. Visão Geral
+
+Neste tutorial, veremos como injetar um valor em um *campo estático* com *Spring*.
+
+### 2. Problema
+
+Para começar, vamos imaginar que definimos uma propriedade para um arquivo de propriedades:
+
+```
+name = Inject a value to a static field
+```
+
+Depois, queremos injetar seu valor em uma variável de instância.
+
+Isso *geralmente pode ser feito usando a anotação `@Value`* em um campo de instância:
+
+```java
+@Value("${name}")
+private String name;
+```
+
+Então, podemos querer usar `@Value` para injetar algum valor em um campo estático:
+
+```java
+@Component
+public class StaticPropertyHolder {
+    @Value("${name}")
+    private static String STATIC_NAME_INJECTED_ON_FIELD;
+
+    public static String getStaticNameInjectOnField() {
+        return STATIC_NAME_INJECTED_ON_FIELD;
+    }
+}
+```
+
+*Entretanto, quando tentamos aplicá-lo a um campo estático, descobriremos que ele ainda será nulo:*
+
+```java
+assertNull(StaticPropertyHolder.getStaticNameInjectedOnField());
+```
+
+Isso ocorre porque o ***Spring* não suporta `@Value` em campos estáticos**.
+
+### 3. Solução
+
+Primeiro, vamos declarar uma nova *variável estática* privada com o *getter e setter*.
+
+```java
+private static String STATIC_NAME;
+
+@Value("${name}")
+public void setStaticName(String name) {
+    STATIC_NAME = name;
+}
+
+public static String getStaticName() {
+    return STATIC_NAME;
+}
+```
+
+*Anotamos o método setter com a anotação `@Value`.*
+
+Desta vez, o valor esperado é injetado:
+
+```java
+assertEquals("Iject a value to a static field", StaticPropertyHolder.getStaticName());
+```
+
+### 4. Conclusão
+
+A principal lição é usar `@Value` no *método setter*, em vez de no próprio campo estático.
+
+### Fonte:
+
+- Artigo: [Injecting a Value in a Static Field in Spring](https://www.baeldung.com/spring-inject-static-field)
