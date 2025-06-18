@@ -150,7 +150,7 @@ public class Store {
 }
 ```
 
-Ao construir *o objeto `Store`*, se não houver um *método construtor ou setter* para injetar o *bean* ´Item´, o contêiner usará reflexão para *injetar `Item` em `Store`*.
+Ao construir *o objeto `Store`*, se não houver um *método construtor ou setter* para injetar o *bean* `Item`, o contêiner usará reflexão para *injetar `Item` em `Store`*.
 
 Essa abordagem pode parercer mais simples e limpa, *mas não recomendamos usá-la porque tem desvantagens*:
 
@@ -846,3 +846,174 @@ Por outro lado, a principal desvantagem da *injeção de construtor* é sua verb
 ### Fonte:
 
 - Artigo: [Constructor Dependency Injection in Spring](https://www.baeldung.com/constructor-injection-in-spring)
+
+## Por que a *Field Injection (Injeção de Campo)* não é Recomendada
+
+### 1. Visão Geral
+
+Quando executamos a ferramenta de análise de código no *IDE*, ela pode emitir o aviso *"Injeção de campo (Field Injection) não é recomendada"* para campos com a anotação `@Autowired`.
+
+Neste tutorial, exploraremos porque a *injeção de campo* não é recomendada e quais abordagens alternativas podemos usar.
+
+### 2. *Injeção de Dependência (DI)*
+
+O processo em que objetos usam seus objetos dependentes sem a necessidade de defini-los ou criá-los é chamado de *injeção de dependência (DI)*. É uma das principais funcionalidades do *framework*.
+
+Podemos injetar objetos depedentes de três maneiras, usando:
+
+- Injeção de construtor
+- Injeção *Setter*
+- Injeção de campo *(Field Injection)*
+
+A terceira abordagem envolve injetar dependências diretamente na classe usando a *anotação* `@Autowired`. Embora possa ser a abordagem amis simples, precisamos entender que ela pode causar problemas.
+
+### 3. Segurança Nula
+
+**A *injeção de campo** cria um risco de `NullPointerException` se as dependências não forem inicializadas corretamente.*
+
+Vamos definir a classe `EmailService` e adicionar a dependência `EmailValidator` usando a *injeção de campo*:
+
+```java
+@Service
+public class EmailService {
+    @Autowired
+    private EmailValidator emailValidator;
+}
+```
+
+Agora, vamos adicionar o método `process()`.
+
+```java
+public void process(String email) {
+    if (!emailValidator.isValid(email)) {
+        throw new IllegalArgumentException(INVALID_EMAIL);
+    }
+
+    // ...
+}
+```
+
+O `EmailService` só funciona corretamente se fornecemos a dependência `EmailValidator`. **No entanto, usando a injeção de campo, não fornecemos uma meneira direta de instanciar o `EmailService` com as dependências necessárias.**
+
+Além disso, *podemos criar a instância `EmailService` usando o construtor padrão:*
+
+```java
+EmailService emailService = new EmailService();
+emailService.process("test@baeldung.com");
+```
+
+*Executar o código acima causaria `NullPointerException`, pois não fornecemos sua dependência obrigatória, `EmailValidator`.*
+
+**Agora, podemos reduzir o risco de `NullPointerException` usando a injeção de construtor:**
+
+```java
+private final EmailValidator emailValidator;
+
+public EmailService(final EmailValidator emailValidator) {
+    this.emailValidator = emailValidator;
+}
+```
+
+Com essa abordagem, expusemos publicamente as dependências necessárias. Além disso, agora exigimos que os clientes *forneçam as dependências obrigatórias*. Em outras palavras, não há como criar uma nova instância do `EmailService` sem fornecer a instância do `EmailValidator`.
+
+### 4. Imutabilidade
+
+*Usando a injeção de campo, não conseguimos criar classes imutáveis.*
+
+Precisamos instanciar os campos finais quando eles são declarados ou por meio do construtor. *Além disso, o Spring realiza a conexão automática após a chamada dos construtores.* Por tanto, é impossível conectar automaticamente os campos finais usando a *injeção de campo*.
+
+Como as *dependência são mutáveis*, não há como garantir que permanecerão inalteradas após a inicialização. Além disso, *reatribuir campos não finais* pode causar efeitos colaterais inesperados ao executar o aplicativo.
+
+Alternativamente, podemos usar *injeção de construtor* para dependências obrigatórias e *injeção de setter* para dependências opcionais. Dessa forma, podemos garantir que as dependências necessárias permanecerão inalteradas.
+
+### 5. Problemas de Design
+
+#### 5.1. Violação de Responsabilidade Única
+
+Como parte dos *princípios **SOLID***, o princípio de *responsabilidade única* afirma que cada classe deve ter apenas uma responsabilidade. Em outras palavras, uma classe deve ser responsável por apenas uma ação e, portanto, ter apenas um motivo para mudar.
+
+Ao usar a *injeção de campo*, podemos acabar violando o princípio da *responsabilidade única*. **Podemos facilmente adicionar mais dependências do que o necessário e criar uma classe que executa mais de uma tarefa.**
+
+Por outro lado, se usarmos a *injeção de construtor*, perceberemos que podemos ter um *problema de design* se um construtor tiver mais do que algumas dependências. Além disso, até mesmo o *IDE* emitirá um aviso se houver mais de sete parâmetros no construtor.
+
+#### 5.2. Dependências Circulares
+
+Simplifcando, **dependências circulares** ocorrem quando duas classes dependem uma da outra. Devido a essas dependências, é impossível construir objetos, *e a execução pode resultar em erros de tempo de execução ou loops infinitos*.
+
+*O uso de injeção de campo pode fazer com que dependências circulares passem despercebidas:*
+
+```java
+@Componet
+public class DependencyA {
+    @Autowired
+    private DependencyB dependencyB;
+}
+
+@Component
+public class DependencyB {
+    @Autowired
+    private DependencyA dependencyA;
+}
+```
+
+**Como as dependências são injetadas quando necessário e não no carregamento de contexto, o *Spring* não lançará `BeanCurrentlyInCreationException`.**
+
+*Com a injeção de construtor, é possível detectar dependências circulares em tempo de compilação, pois elas criariam erros irresolúveis.*
+
+Além disso, *se tivermos dependências circulares em nosso código*, pode ser um sinal de que algo está errado com nosso design. Portanto, devemos considerar *redesenhar* nossa aplicação, se possível.
+
+**Desde a versão 2.6 do *Spring Boot*, *dependências circulares não são mais permitidas por padrão*.**
+
+### 6. Teste
+
+*Os testes unitários revelam uma das principais desvantagens da abordagem de injeção de campo.*
+
+*Suponha que gostárias de escrever um teste unitário para verificar se o método `process()` defindo no `EmailService` está funcionando corretamente.*
+
+Primeiramente, gostaríamos de simular o objeto `EmailValidator`. No entanto, como inserimos o `EmailValidator` usando a *injeção de campo*, não podemos substituí-lo diretamente por uma versão simulada:
+
+```java
+EmailValidator validator = Mockito.mock(EmailValidator.class);
+EmailService emailServide = new EmailService();
+```
+
+*Além disso, fornecer o método setter na classe `EmailService` introduziria uma vulnerabilidade adicional, pois outras classes, não apenas a classe de teste, poderiam chamar o método.*
+
+**No entanto, podemos instanciar nossa classe *por meio de reflexão*.** Por exemplo, podemos usar o *Mockito*:
+
+```java
+@Mock
+private EmailValidaotr emailValidator;
+
+@InjectMocks
+private EmailService emailService;
+
+@BeforeEach
+public void setup() {
+    MockitoAnnotations.openMocks(this);
+}
+```
+
+O *Mockito* tentará injetar simulações usando a anotação `@InjectMocks`. **No entanto, se a estratégia de injeção de campo falhar, o *Mockito* não reportará a falha.**
+
+Por outro lado, usando a *injeção de construtor*, podemos fornecer as dependências necessárias sem reflexão:
+
+```java
+private EmailValidator emailValidator;
+
+private EmailService emailService;
+
+@BeforeEach
+public void setup() {
+    this.emailValidator = Mockito.mock(EmailValidator.class);
+    this.emailService = new EmailService(emailValidator);
+}
+```
+
+### 7. Conclusão
+
+Para resumir, *em vez da injeção de campo*, poderiamos usar *injeção de construtor para dependências necessárias* e *injeção de setter para dependências opcionais*.
+
+### Fonte:
+
+- Artigo: [Why Is Field Injection Not Recommended?](https://www.baeldung.com/java-spring-field-injection-cons)
