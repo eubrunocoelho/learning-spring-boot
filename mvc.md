@@ -252,3 +252,506 @@ Se marcamos uma classe com ele, ele se aplicará a todos os métodos de manipula
 ### Fonte:
 
 - Artigo: [Spring Web Annotations](https://www.baeldung.com/spring-mvc-annotations)
+
+## Spring `@RequestMapping`
+
+### 1. Visão Geral
+
+A anotação `@RequestMapping` é usada para mapear solicitações da web para métodos do *Spring* `Controller`.
+
+### 2. Noções Básicas de `@RequestMapping`
+
+Começamos com um exemplo simples: mapear uma solicitação `HTTP` para um método usando alguns critérios básicos. Vamos considerar que o *Spring* serve conteúdo no `path` *(caminho do contexto)* raiz (`"/"`) por padrão. Todas as solicitações *`CURL`* neste artigo dependem do caminho do contexto padrão.
+
+#### 2.1. `@RequestMapping` - Por Caminho
+
+```java
+@RequestMapping(value = "/ex/foos", method = RequestMethod.GET)
+@ResponseBody
+public String getFoosBySimplePath() {
+    return "Get some Foos";
+}
+```
+
+Para testar esse mapeamento com um comando `curl` simples, execute:
+
+```
+curl -i http://localhost:8080/ex/foos
+```
+
+#### 2.2 `@RequestMapping` - O Método `HTTP`
+
+O parâmetro do *método `HTTP`* **não tem um valor padrão**. Portanto, se não especificarmos um valor, ele será mapeado para *qualquer solicitação `HTTP`*.
+
+Aqui está um exemplo simples, semelhante ao anterior, mas desta vez mapeado para uma *solicitação `HTTP` `POST`*:
+
+```java
+@RequestMapping(value = "/ex/foos", method = POST)
+@ResponseBody
+public String postFoos() {
+    return "Post some Foos";
+}
+```
+
+Para testar o `POST` por meio de um comando `curl`:
+
+```
+curl -i -X POST http://localhost:8080/ex/foos
+```
+
+### 3. `@RequestMapping` e `HTTP` *Headers* (*Cabeçalhos `HTTP`*)
+
+#### 3.1. `@RequestMapping` com o Atributo `headers`
+
+O mapeamento pode ser ainda mais restringido *especificando um cabeçalho* para a *solicitação*:
+
+```java
+@RequestMapping(value = "/ex/foos", headers = "key=val", method = GET)
+@ResponseBody
+public String getFoosWithHeader() {
+    return "Get some Foos with Header";
+}
+```
+
+Para testar a operação, usaremos o suporte ao cabeçalho `curl`:
+
+```
+curl -i -H "key:val" http://localhost:8080/ex/foos
+```
+
+e até mesmo vários cabeçalhos por meio do atributo `headers` de `@RequestMapping`:
+
+```java
+@RequestMapping(
+    value = "/ex/foos",
+    headers = { "key1=val1", "key2=val2" },
+    method = GET
+)
+@ResponseBody
+public String getFoosWithHeaders() {
+    return "Get some Foos with Header";
+}
+```
+
+Para testar usamos o comando:
+
+```
+curl -i -H "key1:val1" -H "key2:val2" http://localhost:8080/ex/foos
+```
+
+Observe que, para a *sintaxe `curl`*, dois pontos separam a chave do cabeçalho e o valor do cabeçalho, o mesmo que na *especificação `HTTP`*, enquanto no *Spring*, o sinal de igual é usado.
+
+#### 3.2. `@RequestMapping` *Consumes* e *Produces*
+
+O mapeamento de *tipos de mídia produzidos por um método* de `controller` merece atenção.
+
+Podemos mapear uma solicitação com base em seu cabeçalho `Accept` por meio do atributo de cabeçalho `@RequestMapping` apresentado acima:
+
+```java
+@RequestMapping(
+    value = "/ex/foos",
+    method = GET,
+    headers = "Accept=application/json"
+)
+@ResponseBody
+public String getFoosAsJsonFromBrowser() {
+    return "Get some Foos with Header Old";
+}
+```
+
+A correspondência para essa maneira de definir o cabeçalho `Accept` *é flexível* - ela usa `contains` em vez de `equals`, então uma solicitação como a seguinte ainda seria mapeada corretamente:
+
+```
+curl -H "Accept:application/json,text/html" http://localhost:8080/ex/foos
+```
+
+*A partir do **Spring 3.1**, a anotação `@RequestMapping` agora tem os atributos `produces` e `consumes`, especficamente para essa finalidade:*
+
+```java
+@RequestMapping(
+    value = "/ex/foos",
+    method = RequestMethod.GET,
+    produces = "application/json"
+)
+@ResponseBody
+public String getFoosAsJsonFromREST() {
+    return "Get some Foos with Header New";
+}
+```
+
+Além disso, o antigo tipo de mapeamento com o atributo `headers` será automaticamente convertido para o novo mecanismo `produces` *a partir do **Spring 3.1***, então os resultados serão idênticos.
+
+```
+curl -H "Accept:application/json" http://localhost:8080/ex/foos
+```
+
+Além disso, *`produces` também suporta vários valores*:
+
+```java
+@RequestMapping(
+    value = "/ex/foos",
+    method = GET,
+    produces = { "aplication/json", "application/xml" }
+)
+```
+
+Tenha em mente que essas - as formas antiga e nova de especificar o cabeçalho `Accept` - são basicamente o mesmo mapeamento, então *o Spring não as permitirá juntas*.
+
+Ter ambos os métodos ativos resultaria em:
+
+```
+Caused by: java.lang.IllegalStateException: Ambiguous mapping found. 
+Cannot map 'fooController' bean method 
+java.lang.String 
+org.baeldung.spring.web.controller
+  .FooController.getFoosAsJsonFromREST()
+to 
+{ [/ex/foos],
+  methods=[GET],params=[],headers=[],
+  consumes=[],produces=[application/json],custom=[]
+}: 
+There is already 'fooController' bean method
+java.lang.String 
+org.baeldung.spring.web.controller
+  .FooController.getFoosAsJsonFromBrowser() 
+mapped.
+```
+
+*Uma nota final sobre os novos mecanismos de `produces` e `consumes`, que se comportam de forma diferente da na maioria das outras anotações: quando especificadas no nível do tipo, **as anotações no nível do método não complementam, mas substituem** as informações no nível de tipo.*
+
+### 4. `@RequestMapping` com `@PathVariable`
+
+Partes do `URI` de mapeamento podem ser vinculadas a variáveis por meio da anotação `@PathVariable`.
+
+#### 4.1 `@PathVariable` Única
+
+Um exemplo simples com uma única `@PathVariable`:
+
+```java
+@RequestMapping(value = "/ex/foos/{id}", method = GET)
+@ResponseBody
+public String getFoosBySimplePathWithPathVariable(
+    @PathVariable("id") long id
+) {
+    return "Get a specific Foo with id=" + id;
+}
+```
+
+```
+curl http://localhost:8080/ex/foos/1
+```
+
+Se o nome do parâmetro do método corresponder exatamente ao nome da *variável de caminho*, isso pode ser simplficado *usando `@PathVariable`* sem valor:
+
+```java
+@RequestMapping(value = "/ex/foos/{id}", method = GET)
+@ResponseBody
+public String getFoosBySimplePathWithPathVariable(@PathVariable String id) {
+    return "Get a specific Foo with id=" + id;
+}
+```
+
+Observe que `@PathVariable` se beneficia da conversão automática de tipo, então poderiámos ter declarado `id` como:
+
+```java
+@PathVariable long id
+```
+
+#### 4.2. Múltiplas `@PathVariable`
+
+Um *`URI` mais complexo* pode precisar mapear várias partes do `URI` para *vários valores*:
+
+```java
+@RequestMapping(value = "/ex/foos/{fooid}/bar/{barid}", method = GET)
+@ResponseBody
+public String getFoosBySimplePathWithPathVariables (
+    @PathVariable long fooid, @PathVariable long barid
+) {
+    return "Get a specific Bar with id=" + barid +
+        " from a Foo with id=" + fooid;
+}
+```
+
+Isso é facilmente testado com um `curl` da mesma maneira:
+
+```
+curl http://localhost/foos/1/bar/2
+```
+
+#### 4.3. `@PathVariable` com `Regex`
+
+*Expressões regulares* também podem ser usadas ao mapear `@PathVariable`.
+
+```java
+@RequestMapping(value = "/ex/bars/{numericId:[\\d+]}", method = GET)
+@ResponseBody
+public String getBarsBySimplePathWithPathVariable(
+    @PathVariable long numericId
+) {
+    return "Get a specific Bar with id" + numericId;
+}
+```
+
+Os seguintes `URIs` corresponderão:
+
+```
+http://localhost:8080/ex/bars/1
+```
+
+Mas não à:
+
+```
+http://localhost:8080/ex/bars/abc
+```
+
+### 5. `@RequestMapping` com `@RequestParam`
+
+`@RequestMapping` permite o **mapeamento fácil de parâmetros de `URL` com a anotação `@RequestParam`**.
+
+Agora estamos mapeando uma solicitação para um `URI`:
+
+```
+http://localhost:8080/ex/bars?id=100
+```
+
+```java
+@RequestMappring(value = "/ex/bars", method = GET)
+@ResponseBody
+public String getBarBySimplePathWithRequestParam(
+    @RequestParam("id") long id
+) {
+    return "Get a specific Bar with id=" + id;
+}
+```
+
+Estamos então extraindo o valor do parâmetro `id` usando a anotação `@RequestParam("id")` na assinatura do método do `controller`.
+
+Para enviar uma solicitação com parâmetro `id`, usaremos o suporte a parâmetros em `curl`:
+
+```
+curl -i http://localhost:8080/ex/bars --get -d id=100
+```
+
+Neste exemplo, o parâmetro foi vinculado diretamente, sem ter sido declarado primeiro.
+
+Para *cenários mais avançados*, *`@RequestMapping` pode opcionalmente definir os parâmetros* como outra maneira de restringir o mapeamento da solicitação:
+
+```java
+@RequestMapping(value = "/ex/bars", params = "id", method = GET)
+@ResponseBody
+public String getBarBySimplePathWithExplicitRequestParam(
+    @RequestParam("id") long id
+) {
+    return "Get a specific Bar with id=" + id;
+}
+```
+
+Mapeamentos ainda *mais flexíveis* são permitidos. Vários valores de *parâmetros* podem ser definidos, e nem todos precisam ser usados:
+
+```java
+@RequestMapping(
+    value = "/ex/bars",
+    params = { "id", "second" },
+    method = GET
+)
+@ResponseBody
+public String getBarBySimplePathWithExplicitRequestParams(
+    @RequestParam("id") long id
+) {
+    return "Narrow Get a specific Bar with id=" + id;
+}
+```
+
+E claro, uma solicitação para um `URI` como:
+
+```
+http://localhost:8080/ex/bars?id=100&second=something
+```
+
+sempre será mapeado para a melhor correspondência - que é a correspondência mais restrita, o que define o `id` e o `second`.
+
+### 6. Casos Extremos de Mapeamento de Solicitações
+
+#### 6.1. `@RequestMappoing` - Vários Caminhos Mapeados para o mesmo Método do `Controller`
+
+Embora um único valor de caminho `@RequestMapping` seja normalmente usado para um único método de `controller` *(apenas uma boa prática, não uma regra rígida)*, há alguns casos em que *pode ser necessário mapear várias solicitações para um mesmo método*.
+
+Neste caso, **o atributo value de `@RequestMapping` aceita múltiplos mapeamentos**.
+
+```java
+@RequestMapping(
+    value = { "/ex/advanced/bars", "/ex/advanced/foos" },
+    method = GET
+)
+@ResponseBody
+public String getFoosOrBarsByPath() {
+    return "Advanced - Get some Foos or Bars";
+}
+```
+
+Agora ambos os comandos `curl` devem atingir o mesmo método:
+
+```
+curl -i http://localhost:8080/ex/advanced/foos
+curl -i http://localhost:8080/ex/advanced/bars
+```
+
+#### 6.2. `@RequestMapping` - Múltiplos Métodos de Solicitação `HTTP` para o mesmo Método de `Controller`
+
+Várias solicitações usando diferentes *verbos `HTTP`* podem ser mapeados para o *mesmo método* de `controller`:
+
+```java
+@RequestMapping(
+    value = "/ex/foos/multiple",
+    method = { RequestMethod.PUT, RequestMethod.POST }
+)
+@RepsonseBody
+public String putAndPostFoos() {
+    return "Advanced - PUT and POST within single method";
+}
+```
+
+Com `curl`, ambos agora atingirão o mesmo método:
+
+```
+curl -i -X POST http://localhost:8080/ex/foos/multiple
+curl -i -X PUT http://localhost:8080/ex/foos/multiple
+```
+
+#### 6.3. `@RequestMapping` - um `fallback` para todas as Solicitações
+
+Para implementar um `fallback` simples para todas as solicitações usando um método `HTTP` específico, por exemplo, para um `GET`:
+
+```java
+@RequestMapping(value = "*", method = RequestMethod.GET)
+@ResponseBody
+public String getFallback() {
+    return "Fallback for GET Requests";
+}
+```
+
+Ou mesmo, para todas as solicitações:
+
+```java
+@RequestMapping(
+    value = "*",
+    method = { RequestMethod.GET, RequestMethod.POST ... }
+)
+@ResponseBody
+public String allFallback() {
+    return "Fallback for All Requests";
+}
+```
+
+#### 6.4. Erro de Mapeamento Ambíguo
+
+O erro de mapeamento ambíguo ocorre quando o *Spring* avalia dois ou mais mapeamentos de requisição como sendo iguais para métodos de `controller` diferentes. Um mapeamento de requisição é o mesmo quando possui o mesmo método `HTTP`, `URL`, parâmetros, cabeçalhos e tipo de mídia.
+
+Por exemplo:
+
+```java
+@GetMapping(value = "foos/duplicate")
+public String duplicate() {
+    return "Duplicate";
+}
+
+@GetMapping(value = "foos/duplicate")
+public String duplicateEx() {
+    return "Duplicate";
+}
+```
+
+A exceção lançada geralmente tem mensagens de erro semelhantes a isto:
+
+```
+Caused by: java.lang.IllegalStateException: Ambiguous mapping.
+  Cannot map 'fooMappingExamplesController' method 
+  public java.lang.String org.baeldung.web.controller.FooMappingExamplesController.duplicateEx()
+  to {[/ex/foos/duplicate],methods=[GET]}:
+  There is already 'fooMappingExamplesController' bean method
+  public java.lang.String org.baeldung.web.controller.FooMappingExamplesController.duplicate() mapped.
+```
+
+Uma leitura cuidadosa da mensagem de erro aponta para o fato de que o *Spring* não consegue mapear o método `org.baeldung.web.controller.FooMappingExamplesController.duplicateEx()`, pois ele tem um mapeamento conflitante com um `org.baeldung.web.controller.FooMappingExamplesController.duplicate()` já mapeado.
+
+**O trecho de código abaixo não resultará em erro de mapeamente ambíguo porque ambos os métodos retornam tipos de conteúdo diferentes:**
+
+```java
+@GetMapping(value = "foos/duplicate", produces = MediaType.APPLICATION_XML_VALUE)
+public String duplicateXml() {
+    return "<message>Duplicate</message>";
+}
+
+@GetMapping(value = "foos/duplicate", produces = MediaType.APPLICATION_JSON_VALUE)
+public String duplicateJson() {
+    return "{\"message\":\"Duplicate\"}";
+}
+```
+
+Essa diferenciação permite que nosso `controller` retorne a representação de dados correta com base no cabeçalho `Accepts` fornecido na solicitação.
+
+Outra maneira de resolver isso é *atualizar a `URL`* atribuída a qualquer um dos dois métodos envolvidos.
+
+### 7. Novos Atalhos de Mapeamento de Solicitações
+
+O **Spring Framework 4.3** introduzir algumas novas anotações de *mapeamento `HTTP`*, todas baseadas em `@RequestMapping`:
+
+- `@GetMapping`
+- `@PostMapping`
+- `@PutMapping`
+- `@DeleteMapping`
+- `@PatchMapping`
+
+Essas novas anotações podem melhorar a legibilidade e reduzir a verbosidade do código.
+
+Vamos analisar essas novas anotações em ação criando uma *`API RESTful`* que suporta *operações `CRUD`*:
+
+```java
+@GetMapping("/{id}")
+public ResponseEntity<?> getBazz(@PathVariable String id){
+    return new ResponseEntity<>(new Bazz(id, "Bazz"+id), HttpStatus.OK);
+}
+
+@PostMapping
+public ResponseEntity<?> newBazz(@RequestParam("name") String name){
+    return new ResponseEntity<>(new Bazz("5", name), HttpStatus.OK);
+}
+
+@PutMapping("/{id}")
+public ResponseEntity<?> updateBazz(
+  @PathVariable String id,
+  @RequestParam("name") String name) {
+    return new ResponseEntity<>(new Bazz(id, name), HttpStatus.OK);
+}
+
+@DeleteMapping("/{id}")
+public ResponseEntity<?> deleteBazz(@PathVariable String id){
+    return new ResponseEntity<>(new Bazz(id), HttpStatus.OK);
+}
+```
+
+### 8. Configuração *Spring*
+
+A configuração do *Spring MVC* é bastante simples, considerando que nosso `FooController` está definido no seguinte pacote:
+
+```java
+package org.baeldung.spring.web.controller;
+
+@Controller
+public class FooController {...}
+```
+
+Precisamos apenas de uma classe `@Configuration` para habilitar o suporte completo ao `MVC` e configurar o escaneamento de `classpath` para o `controller`.
+
+```java
+@Configuration
+@EnableWebMvc
+@ComponentScan({ "org.baeldung.spring.web.controller" })
+public class MvcConfig {
+    // ...
+}
+```
+
+### Fonte:
+
+- Artigo: [Spring @RequestMapping](https://www.baeldung.com/spring-requestmapping)
