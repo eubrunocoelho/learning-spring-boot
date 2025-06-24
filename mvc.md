@@ -949,3 +949,154 @@ IDs are [1,2]
 ### Fonte:
 
 - Artigo: [Spring @RequestParam Annotation](https://www.baeldung.com/spring-request-param)
+
+## *Spring MVC* e a anotação `@ModelAttribute`
+
+### 1. Visão Geral
+
+**Uma das anotações mais importantes do *Spring MVC* é a anotação `@ModelAttribute`.**
+
+`@ModelAttribute` é uma anotação que vincula um parâmetro de método ou valor de retorno de método a um atributo de modelo nomeado e, em seguida, o expôe a uma visualização da web.
+
+Neste artigo, demonstraremos a usabilidade e a funcionalidade desta anotação por meio de um conceito comum: *um formulário enviado por um funcionário da empresa*.
+
+### 2. `@ModelAttribute` em Detalhes
+
+Como o parágrafo introdutório revelou, podemos usar `@ModelAttribute` como um parâmetro de método ou no nível do método.
+
+#### 2.1. No Nível do Método
+
+Quando usamos a anotação no nível do método, indica que o objetivo do método é adicionar um ou mais atributos do modelo. Esses métodos suportam os mesmos tipos de argumento que os métodos `@RequestMapping`, mas não podem ser mapeados diretamente para solicitações.
+
+Vejamos um exemplo rápido:
+
+```java
+@ModelAttribute
+public void addAttributes(Model model) {
+    model.addAttriute("msg", "Welcome to the Netherlands!");
+}
+```
+
+No exemplo acima, vemos um método que adiciona um atributo chamado `msg` a todos *os modelos* definidos na classe de `controller`.
+
+Em geral, o *Spring MVC* sempre fará uma chamada para esse método primeiro, antes de chamar qualquer método do manipulador de requições. Basicamente, os métodos **`@ModelAttribute` são invocados antes dos métodos do `controller` anotados com `@RequestMapping`**. Isso ocorre porque o objeto do modelo precisa ser criado antes que qualquer processamento seja iniciado dentro dos métodos de `controller`.
+
+*Também é importante anotar a classe respectiva como `@ControllerAdvice`. Assim, podemos adicionar valores no modelo que serão identificados como **globais**. Isso significa que, para cada solicitação, existe um valor padrão para cada método na resposta.*
+
+#### 2.2. Como um Argumento de Método
+
+Quando usamos a anotação como argumento de método, isso indica que devemos recuperar o argumento do modelo. Quando a anotação não estiver presente, ela deve primeiro ser instanciada e, em seguida, adicionada ao modelo. Uma vez presentes no modelo, os campos de argumentos devem ser preenchidos com todos os parâmetros da solicitação que tenham os nomes correspondentes.
+
+No código a seguir, preencheremos o atributo do modelo `employee` com dados de um formulário enviado ao *endpoint* `addEmployee`. O *Spring MVC* faz isso em segundo plano antes de invocar o método `submit`:
+
+```java
+@RequestMapping(value = "/addEmployee", method = RequestMethod.POST)
+public String submit(@ModelAttribute("employee") Employee employee) {
+    // Code that uses the employee object
+
+    return "employeeView";
+}
+```
+
+Mais adiante neste artigo, veremos um exemplo completo de como usar o objeto `employee` para preencher o modelo `employeeView`.
+
+Ele vincula os dados do formulário a um `bean`. **O `controller` anotado com `@RequestMapping` pode ter agumentos de classe personalizados anotados com `@ModelAttribute`.**
+
+No *Spring MVC*, chamamos isso de vinculação de dados, um mecanismo comum que nos poupa de ter que analisar cada campo de formulário individualmente.
+
+### 3. Exemplo de Formulário
+
+Nesta seção, veremos o exemplo descrito na seção de visão geral, um formulário muito básico que solicita que um usuário (*especificamente um funcionário da empresa*) insira algumas informações pessoais (*nome e ID*). Após a conclusão do envio, e sem erros, o usuário espera ver os dados enviados anteriormente exibidos em outra tela.
+
+#### 3.1. A `View`
+
+Vamos primeiro criar um formulário simples com os campos `id` e `name`:
+
+```jsp
+<form:form method="POST" action="/spring-mvc-basics/addEmployee" modelAttribute="employee">
+    <form:label path="name">Name</form:label>
+    <form:input path="name" />
+    <form:label path="id">Id</form:label>
+    <form:input path="id" />
+    <input type="submit" value="Submit" />
+</form:form>
+```
+
+#### 3.2. O `Controller`
+
+Aqui está a classe de `controller`, onde implementaremos a lócia para a visualização mencionada anteriormente:
+
+```java
+@Controller
+@ControllerAdvice
+public class EmployeeController {
+    private Map<Long, Employee> employeeMap = new HashMap<>();
+
+    @RequestMapping(value = "/addEmployee", method = RequestMethod.POST)
+    public String submit(
+        @ModelAttribute("employee") Employee employee,
+        BindingResult result, ModelMap model
+    ) {
+        if (result.hasErrors()) {
+            return "error";
+        }
+
+        model.addAttribute("name", employee.getName());
+        model.addAttribute("id", employee.getId());
+
+        employeeMap.put(employee.getId(), employee);
+
+        return "employeeView";
+    }
+
+    @ModelAttribute
+    public void addAttribute(Model model) {
+        model.addAttribute("msg", "Welcome to the Netherlands!");
+    }
+}
+```
+
+No método `submit()`, temos um objeto `Employee` vinculado à nossa `View`. Podemos mapear os campos do nosso formulário para um modelo de objeto de forma simples. No método, estamos buscando valores do formulário e definindo-os como `ModelMap`.
+
+**No final, retornamos employeeView, o que significa que chamamos o respectivo arquivo `JSP` como um representante da `View`.**
+
+Além disso, há também um método `addAttributes()`. Sua finalidade é adicionar valores no `Model` que serão identificados globalmente. Ou seja, cada solicitação para cada método do `controller` retornará um valor padrão como resposta. Também precisamos anotar a classe específica como `@ControllerAdvice`.
+
+#### 3.3. O `Model`
+
+Como mencionado anteriormente, o objeto `Model` é muito simples e contém tudo o que os atributos de *"front-end"* exigem. Agora, vejamos um exemplo:
+
+```java
+@XmlRootElement
+public class Employee {
+    private long id;
+    private String name;
+
+    public Employee(long id, String name) {
+        this.id = id;
+        this.name = name;
+    }
+
+    // standard getters and setters removed
+}
+```
+
+#### 3.4. Conclusão
+
+`@ControllerAdvice` auxilia um `controller` e, em particular, os métodos `@ModelAttribute` que se aplicam a todos os métodos `@RequestMapping`. Obviamente, nosso método `addAttributes()` será o primeiro a ser executado, antes dos demais métodos `@RequestMapping`.
+
+Tendo isso em mente, e depois que `submit()` e `addAttributes()` forem executados, podemos referir a eles na `View` retornada da classe `Controller` mencionando seus nomes dentro de um duo de chaves dolarizadas, como `${name}`.
+
+#### 3.5. Visualização de Resultados
+
+Agora vamos imprimir o que recebemos do formulário:
+
+```jsp
+<h3>${msg}</h3>
+Name: ${name}
+ID: ${id}
+```
+
+### Fonte:
+
+- Artigo: [Spring MVC and the @ModelAttribute Annotation](https://www.baeldung.com/spring-mvc-and-the-modelattribute-annotation)
