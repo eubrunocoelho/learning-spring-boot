@@ -1341,3 +1341,62 @@ Além disso, mostramos como definir um tipo de contéudo ao usar `@ResponseBody`
 ### Fonte:
 
 - Artigo: [Spring's RequestBody and ResponseBody Annotations](https://www.baeldung.com/spring-request-response-body)
+
+## Usando *Spring* `@ResponseStatus` para Definir o Código de Status `HTTP`
+
+### 1. Introdução
+
+No *Spring MVC*, temos muitas maneiras de **definir o código de status de uma resposta `HTTP`**.
+
+Neste artigo, veremos a maneira mais direta: *usando a anotação `@ResponseStatus`*.
+
+### 2. Sobre os Métodos de `controller`
+
+Quando um `endpoint` retorna com sucesso, o *Spring* fornece uma resposta `HTTP 200` (*OK*).
+
+Se quisermos especificar o **status de resposta de um método `controller`**, podemos marcá-lo com `@ResponseStatus`. Ele possui dois argumentos intercambiáveis para o status de resposta desejado: *código* e *valor*. Por exemplo, *podemos indicar que o servidor se recusa a preparar café poque é um bule de chá*:
+
+```java
+@ResponseStatus(HttpStatus.I_AM_TEAPOT)
+void teaPot() {}
+```
+
+Quando queremos *sinalizar um erro*, podemos fornecer uma mensagem de erro por meio do argumento `reason`:
+
+```java
+@ResponseStatus(HttpStatus.BAD_REQUEST, reason = "Some parameters are invalid")
+void onIllegalArgumentException(IllegalArgumentException exception) {}
+```
+
+Observe que, quando definimos `reason`, o *Spring* chama `HttpServletResponse.sendError()`. Portanto, ele enviará unma **página de erro `HTML` para o cliente, o que o torna inadequado para `endpoints` *REST***.
+
+Observe também que o *Spring* só usa `@ResponseStatus` quando **o método marcado é concluído com sucesso** (sem lançar uma exceção).
+
+### 3. Com Manipuladores de Erros
+
+Temos *três maneiras* de usar `@ResponseStatus` para converter uma *exceção* em um status de resposta `HTTP`:
+
+- usando `@ExceptionHandler`
+- usando `@ControllerAdvice`
+- marcando a classe `Exception`
+
+Para usar as *duas primeiras* soluções, precisamos definir um método de tratamento de erros.
+
+Podemos usar `@ResponseStatus` com esses métodos de tratamento de erros **da mesma forma que fizemos com métodos MVC regulares** na seção anterior.
+
+*Quando não precisamos de resposta de erro dinâmicas, a **solução mais direta é a terceira**: marcar a classe `Exception` com `@ResponseStatus`:*
+
+```java
+@ResponseStatus(code = HttpStatus.BAD_REQUEST)
+class CustomException extends RuntimeException {}
+```
+
+Quando o *Spring* captura essa exceção, **ele usa as configurações que fornecemos em `@ResponseStatus`**.
+
+Observe que quando marcamos uma classe `Exception` com `@ResponseStatus`, o *Spring* sempre chama `HttpServletResponse.sendError()`, *independentemente de definirmos o motivo ou não*.
+
+Observe também que o *Spring* usa a mesma configuração para *subclasses*, a menos que as marquemos com `@ResponseStatus` também.
+
+### Fonte:
+
+- Artigo: [Using @ResponseStatus to Set HTTP Status Code](https://www.baeldung.com/spring-response-status)
