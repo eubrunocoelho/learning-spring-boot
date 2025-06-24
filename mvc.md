@@ -848,7 +848,7 @@ invocará o método corretamente.
 
 *Quando o parâmetro não é especificado, o parâmetro do método é vinculado a `null`.*
 
-#### 4.1. Usando `Optional` em *Java 8***
+#### 4.1. Usando `Optional` em *Java 8*
 
 Alternativamente, podemos encapsular o parâmetro em `Optional`.
 
