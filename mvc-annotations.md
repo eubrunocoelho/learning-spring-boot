@@ -1,4 +1,4 @@
-# Série *Spring MVC*
+# Série Anotações *Spring MVC*
 
 O *Spring MVC* fornece ferramentas que controlam tanto aplicativos web típicos quanto *APIs REST*.
 
@@ -1400,3 +1400,163 @@ Observe também que o *Spring* usa a mesma configuração para *subclasses*, a m
 ### Fonte:
 
 - Artigo: [Using @ResponseStatus to Set HTTP Status Code](https://www.baeldung.com/spring-response-status)
+
+## Novas Anotações de Atalho do *Spring* `@RequestMapping`
+
+### 1. Visão Geral
+
+O **Spring 4.3** introduziu algumas anotações compostas em nível de métodos muito interessantes para suavizar o tratamento de `@RequestMapping` em projetos típicos do *Spring MVC*.
+
+### 2. Novas Anotações
+
+Normalmente, se quiséssemos *implementar o manipulador de `URL`* usando a anotação `@RequestMapping` tradicional, seria algo assim:
+
+```java
+@RequestMapping(value = "/get/{id}", method = RequestMethod.GET)
+```
+
+A nova abordagem torna possível encurtar isso simplesmente para:
+
+```java
+@GetMapping("/get/{id}")
+```
+
+*Atualmente, o **Spring** suporta cinco tipos de anotações integradas para lidar co diferentes tipos de métodos de solicitação `HTTP` de entrada: `GET`, `POST`, `PUT`, `DELETE` e `PATH`.* Essas anotações são:
+
+- `@GetMapping`
+- `@PostMapping`
+- `@PutMapping`
+- `@Deleteapping`
+- `@PathMapping`
+
+Pela convenção de nomenclatura, podemos ver que cada anotação serve para manipular o respectivo tipo de método de solicitação de entrada, ou seja, `@GetMapping` é usado para manipular o tipo de método de solicitação `GET`, `@PostMapping` é usado para manipular o tipo de método de solicitação `POST`, etc.
+
+### 3. Como Funciona
+
+*Todas as anotações acima já estão antoadas internamente com `@RequestMapping` e o respectivo valor no elemento do método.*
+
+Por exemplo, se observamos o *código-fonte* da anotação `@GetMapping`, podemos ver que ela já está anotada com `RequestMethod.GET` da seguinte maneira:
+
+```java
+@Target({ java.lang.annotation.ElementType.METHOD })
+@Retention(RetentionPolicy.RUNTIME)
+@Documented
+@RequestMapping(method = { RequestMethod.GET })
+public @interface GetMapping {
+    // abstract codes
+}
+```
+
+*Todas as anotações são criadas da mesma maneira, ou seja, `@PostMapping` é anotado com `RequestMethod.POST`, `@PutMapping` é anotado com `RequestMethod.PUT`, etc.*
+
+### 4. Implementação
+
+Vamos tentar usar essas anotações para criar um aplicativo *REST* rápido.
+
+Observe que, como usaremos o **Maven** para construir o projeto e o *Spring MVC* para criar nosso aplicativo, precisamos adicionar as dependências necessárias no `pom.xml`:
+
+```xml
+<dependency>
+    <groupId>org.springframework</groupId>
+    <artifactId>spring-webmvc</artifactId>
+    <version>5.2.2.RELEASE</version>
+</dependency>
+```
+
+*A versão mais recente do spring-webmvc* está disponível no [Repositório Central Maven](https://mvnrepository.com/artifact/org.springframework/spring-webmvc).
+
+Agora, precisamos criar o `controller` para mapear a `URL` da solicaitação de entrada. Dentro desse `controller`, usaríamos todas essas anotações, uma por uma.
+
+#### 4.1. `@GetMapping`
+
+```java
+@GetMapping("/get")
+public @ResponseBody ResponseEntity<String> get() {
+    return new ResposeEntity<String>("GET Response", HttpStatus.OK);
+}
+```
+
+```java
+@GetMapping("/get/{id}")
+public @ResponseBody ResponseEntity<String> getById(@PathVariable String id) {
+    return new ResponseEntity<String>("GET Response: " + id, HttpStatus.OK);
+}
+```
+
+#### 4.2. `@PostMapping`
+
+```java
+@PostMapping("/post")
+public @ResponseBody ResponseEntity<String> post() {
+    return new ResponseEntity<String>("POST Response", HttpStatus.OK);
+}
+```
+
+#### 4.3. `@PutMapping`
+
+```java
+@PutMapping("/put")
+public @ResponseBody ResponseEntity<String> put() {
+    return new ResponseEntity<String>("PUT Response", HttpStatus.OK);
+}
+```
+
+#### 4.4. `@DeleteMapping`
+
+```java
+@DeleteMapping("/delete")
+public @ResponseBody ResponseEntity<String> delete() {
+    return new ResponseEntity<String>("DELETE Response", HttpStatus.OK);
+}
+```
+
+#### 4.5. `@PatchMapping`
+
+```java
+@PatchMapping("/patch")
+public @ResponseBody ResponseEntity<String> patch() {
+    return new ResponseEntity<String>("PATCH Response", HttpStatus.OK);
+}
+```
+
+**Pontos a serem observados:**
+
+- Utilizamos as anotações necessárias para manipular métodos `HTTP` de entrada com `URI`. Por exemplo, `@GetMapping` para manipular o `URI` `/get`, `@PostMapping` para manipular o `URI` `/post` e assim por diante.
+- Como estamos criando uma aplicação baseada em `REST`, estamos retornando uma string constante *(exclusiva para cada solicitação)* com *código 200 de resposta* para simplificar a aplicação. Usamos a anotação `@ResponseBody` do *Spring* neste caso.
+- Se tivéssemos que manipular qualquer variável de caminho de `URL`, poderíamos fazê-lo de uma maneira muito menos comum do que costumávamos fazer no caso de usar `@RequestMapping`.
+
+### 5. Testando a Aplicação
+
+Para testar a aplicação, precisamos criar alguns casos de testes usando `JUnit`. Usaríamos `SpringJUnit4ClassRunner` para iniciar a classe de teste. Criaríamos cinco casos de teste diferentes para testar cada anotação e cada manipulador que declaramos no `controller`.
+
+Vamos simplificar o caso de teste de exemplo de `@GetMapping`:
+
+```java
+@Test
+public void givenUrl_whenGetRequest_thenFindGetResponse() throws Exception {
+    MockHttpServletRequestBuilder builder = MockMvcRequestBuilders.get("/get");
+
+    ResultMatcher contentMatcher = MockMvcResultMatchers.content().string("GET Response");
+
+    this.mockMvc.perform(builder).addExcept(contentMatcher).andExcept(MockMvcResultMatchers.status().isOk());
+}
+```
+
+Como podemos ver, estamos esperando uma *string constante* `GET Response`, quando acessamos o `GET` com a `URL` `/get`.
+
+Agora, vamos criar o caso de teste para testar `@PostMapping`:
+
+```java
+@Test
+public void givenUrl_whenPostRequest_thenFindPostResponse() throws Exception {
+    MockHttpServletRequestBuilder builder = MockMvcRequestBuilders.post("/post");
+
+    ResultMatcher contentMatcher = MockMvcResultMatchers.content().string("POST Response");
+
+    this.mockMvc.perform(builder).andExcept(contentMatcher).andExcept(MockMvcResultMatchers.status().isOk());
+}
+```
+
+**Da mesma forma, criamos o restante dos casos de teste par testar todos os métodos `HTTP`.**
+
+Como alternativa, podemos sempre usar quaisquer *cliente `REST` comum*, por exemplo, *PostMan*, *RESTClient* etc., par testar nossa aplicação. Nesse caso, precisamos ter um pouco de cuidado ao escolher o tipo de *método `HTTP`* correto ao usar o *cliente `REST`*. Caso contrário, ele retornaria o *status de erro **405***.
