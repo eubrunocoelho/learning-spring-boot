@@ -1162,3 +1162,182 @@ Cada método de tratamento de solicitação da classe do `controller` serializa 
 ### Fonte:
 
 - Artigo: [The Spring @Controller and @RestController](https://www.baeldung.com/spring-controller-vs-restcontroller)
+
+## Anotaçoes `@RequestBody` e `@ResponseBody` do *Spring*
+
+### 1. Introdução
+
+Neste artigo, fornecemos uma visão geral concisa das anotações `@RequestBody` e `@ResponseBody` do *Spring*.
+
+### 2. `@RequestBody`
+
+Simplificando, **a anotação `@RequestBody` mapeia o corpo do `HttpRequest` para um objeto de transferência ou domínio, permitindo a desserialização automática** do corpo do `HttpRequest` de entrada em um objeto **Java**.
+
+Primeiro, vamos dar uma olhada em um método de `controller` do *Spring*:
+
+```java
+@PostMapping("/request")
+public ResponseEntity postController(
+    @RequestBody LoginForm loginForm
+) {
+    exampleService.fakeAuthenticate(loginForm);
+    
+    return ResponseEntity.ok(HttpStatus.OK);
+}
+```
+
+O *Spring* desserializa automaticamente o `JSON` em um tipo **Java**, supondo que um tipo apropriado seja especificado.
+
+Por padrão, **o tipo que anotamos com a anotação `@RequestBody` deve corresponder ao `JSON` enviado do nosso `controller` do lado do cliente**:
+
+```java
+public class LoginForm {
+    private String username;
+    private String password;
+
+    // ...
+}
+```
+
+Aqui, o objeto que usamos para representar o corpo do `HttpRequest` é mapeado para nosso objeto `LoginForm`.
+
+Vamos testar isso usando `CURL`:
+
+```
+curl -i \
+-H "Accept: application/json" \
+-H "Content-Type:application/json" \
+-X POST --data 
+  '{"username": "johnny", "password": "password"}' "https://localhost:8080/spring-boot-rest/post/=request"
+```
+
+Isso é tudo o que precisamos para uma **API REST** do *Spring* e um cliente *Angular* usando a anotação `@RequestBody`.
+
+### 3. `@ResponseBody`
+
+A anotação `@ResponseBody` informa ao `controller` que o objeto retornado é automaticamente serializado em `JSON` e passado de volta para o objeto `HttpResponse`.
+
+Suponha que temos um objeto `Response` personalizado:
+
+```java
+public class RespondeTransfer {
+    private String text;
+
+    // standard getters/setters
+}
+```
+
+Em seguida, o `controller` associado pode ser implementado:
+
+```java
+@Controller
+@RequestMapping("/post")
+public class ExamplePostController {
+    @Autowired
+    ExampleService exampleService;
+
+    @PostMapping("/response")
+    @ResponseBody
+    public ResponseTransfer postResponseController(
+        @RequestBody LoginForm loginForm
+    ) {
+        return ResponseTransfer("Thanks For Posting!!!");
+    }
+}
+```
+
+No console do desenvolvedor do nosso navegador ou usando uma ferramenta como o *Postman*, podemos ver a seguinte resposta:
+
+```json
+{
+    "text": "Thanks For Posting!!!"
+}
+```
+
+*Lembre-se, não precisamos anotar os `controllers` anotados com `@RestController` com a anotação `@ResponseBody`, pois o **Spring** faz isso por padrão.*
+
+#### 3.1. Definindo o Tipo de Conteúdo
+
+Quando usamos a anotação `@ResponseBody`, ainda podemos definir explicitamente o tipo de conteúdo que nosso método retorna.
+
+Para isso, *podemos usar o atributo `produces` do `@RequestMapping`*. Observe que as anotações como `@PostMapping`, `@GetMapping`, etc. definem aliases para esse parâmetro.
+
+Vamos agora adicionar um novo `endpoint` que envia uma resposta `JSON`:
+
+```java
+@PostMapping(value = "/content", produces = MediaType.APPLICATION_JSON_VALUE)
+@ResponseBody
+public ResponseTransfer postResponseJsonContent(
+    @RequestBody LoginForm loginForm
+) {
+    return new ResponseTransfer("JSON Content!");
+}
+```
+
+No exemplo, usamos a constante `MediaType.APPLICATION_JSON_VALUE`. Como alternativa, podemos usar `application/json` diretamente.
+
+Em seguida, vamos implmentar um novo método, mapeado para o mesmo caminho `/content`, mas retornando conteúdo `XML`:
+
+```java
+@PostMapping(value = "/content", produces = MediaType.APPLICATION_XML_VALUE)
+@ResponseBody
+public ResponseTransfer postResponseXMLContent(
+    @RequestBody LoginForm loginForm
+) {
+    return new ResponseTransfer("XML Content!");
+}
+```
+
+*Dependendo do valor de um parâmetro `Accept` enviado no cabeçalho da solicitação, obteremos respostas diferentes.*
+
+Vamos ver isso em ação:
+
+```
+curl -i \ 
+-H "Accept: application/json" \ 
+-H "Content-Type:application/json" \ 
+-X POST --data 
+  '{"username": "johnny", "password": "password"}' "https://localhost:8080/spring-boot-rest/post/content"
+```
+
+O comando `CURL` retorna uma resposta `JSON`:
+
+```
+HTTP/1.1 200
+Content-Type: application/json
+Transfer-Encoding: chunked
+Date: Thu, 20 Feb 2020 19:43:06 GMT
+
+{"text":"JSON Content!"}
+```
+
+Agora, vamos alterar o parâmetro `Accept`:
+
+```
+curl -i \
+-H "Accept: application/xml" \
+-H "Content-Type:application/json" \
+-X POST --data
+  '{"username": "johnny", "password": "password"}' "https://localhost:8080/spring-boot-rest/post/content"
+```
+
+Desta vez obtemos um conteúdo `XML`:
+
+```
+HTTP/1.1 200
+Content-Type: application/xml
+Transfer-Encoding: chunked
+Date: Thu, 20 Feb 2020 19:43:19 GMT
+
+<ResponseTransfer><text>XML Content!</text></ResponseTransfer>
+```
+
+### 4. Conclusão
+
+Criamos um cliente *Angular* simples para o aplicativo *Spring* que demonstra como usar as anotações `@RequestBody` e `@ResponseBody`.
+
+Além disso, mostramos como definir um tipo de contéudo ao usar `@ResponseBody`.
+
+### Fonte:
+
+- Artigo: [Spring's RequestBody and ResponseBody Annotations](https://www.baeldung.com/spring-request-response-body)
