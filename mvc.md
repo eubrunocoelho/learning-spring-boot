@@ -755,3 +755,197 @@ public class MvcConfig {
 ### Fonte:
 
 - Artigo: [Spring @RequestMapping](https://www.baeldung.com/spring-requestmapping)
+
+## Anotação Spring `@RequestParam`
+
+### 1. Visão Geral
+
+Neste artigo, exploraremos a anotação `@RequestParam` do *Spring* e seus atributos.
+
+**Simplificando, podemos usar `@RequestParam` para extrair parâmetros de consulta, parâmetros de formulário e até mesmo arquivos da solicitação.**
+
+### 2. Um Mapeamento Simples
+
+Digamos que temos um endpoint `/api/foos` que recebe um parâmetro de consulta chamado `id`:
+
+```java
+@GetMapping("/api/foos")
+@ResponseBody
+public String getFoos(@RequestParram String id) {
+    return "ID: " + id;
+}
+```
+
+Neste exemplo, usamos `@RequestParam` para extrair o parâmetro de consulta `id`.
+
+Uma simples solicitação `GET` invocaria `getFoos`:
+
+```
+http://localhost:8080/spring-mvc-basics/api/foos?id=abc
+----
+ID: abc
+```
+
+Em seguida, **vamos dar uma olhada nos atributos da anotação: `name`, `value`, `required`, `defaultValue`**.
+
+### 3. Especificando o Nome do Parâmetro de Solicitação
+
+No exemplo anterior, tanto o nome da variável quanto o nome do parâmetro são iguais.
+
+**Ás vezes, queremos que sejam diferentes.** Ou, se não estivermos usando o *Spring Boot*, talvez precisamos fazer uma *configuração especial* em tempo de compilação, ou os nomes dos parâmetros não estarão no `bytecode`.
+
+*Podemos configurar o nome `@RequestParam` usando o atributo `name`.*
+
+```java
+@PostMapping("/api/foos")
+@ResponseBody
+public String addFoo(@RequestParam(name = "id") String fooId, @RequestParam String name) {
+    return "ID: " + fooId + " Name: " + name;
+}
+```
+Também podemos fazer `@RequestParam(value = "id")` ou apenas `@RequestParam("id")`.
+
+### 4. Parâmetros de Solicitação Opcionais
+
+*Parâmetros de métodos anotados com `@RequestParam` são necessários por padrão.*
+
+Isso significa que se o parâmetro não estiver presente na solicitação, receberemos um erro:
+
+```
+GET /api/foos HTTP/1.1
+----
+400 Bad Request
+Required String parameter 'id' is not present
+```
+
+**Podemos configurar nosso `@RequestParam` para ser opcional, com o atributo `required`:**
+
+```java
+@GetMapping("/api/foos")
+@ResponseBody
+public String getFoos(@RequestParam(required = false) String id) {
+    return "ID: " + id;
+}
+```
+
+Neste caso, ambos:
+
+```
+http://localhost:8080/spring-mvc-basics/api/foos?id=abc
+----
+ID: abc
+```
+
+e
+
+```
+http://localhost:8080/spring-mvc-basics/api/foos
+----
+ID: null
+```
+
+invocará o método corretamente.
+
+*Quando o parâmetro não é especificado, o parâmetro do método é vinculado a `null`.*
+
+#### 4.1. Usando `Optional` em *Java 8***
+
+Alternativamente, podemos encapsular o parâmetro em `Optional`.
+
+```java
+@GetMapping("/api/foos")
+@ResponseBody
+public String getFoos(@RequestParam Optional<String> id) {
+    return "ID: " + id.orElseGet(() -> "not provided");
+}
+```
+
+*Neste caso, não precisamos especificar o atributo `required`.*
+
+```
+http://localhost:8080/spring-mvc-basics/api/foos 
+---- 
+ID: not provided
+```
+
+### 5. Um Valor Padrão para `@RequestParam`
+
+Também podemos definir um valor padrão para `@RequestParam` usando o atributo `defaultValue`:
+
+```java
+@GetMapping("/api/foos")
+@ResponseBody
+public String getFoos(@RequestParam(defaultValue = "test") String id) {
+    return "ID: " + id;
+}
+```
+
+*Isso é como `required = false`, pois o usuário não precisa mais fornecer o parâmetro:*
+
+```
+http://localhost:8080/spring-mvc-basics/api/foos
+----
+ID: test
+```
+
+Embora ainda estejamos autorizados a fornecê-lo:
+
+```
+http://localhost:8080/spring-mvc-basics/api/foos?id=abc
+----
+ID: abc
+```
+
+*Observe que quando definimos o atributo `defaultValue`, `required` é de fato definido como `false`.*
+
+### 6. Mapeando Todos os Parâmetros
+
+**Também podemos ter vários parâmetros sem definir seus nomes** ou contagem usando apenas um `Map`:
+
+```java
+@PostMapping("/api/foos")
+@ResponseBody
+public String updateFoos(@RequestParam Map<String, String> allParams) {
+    return "Parameters are " + allParams.entrySet();
+}
+```
+
+que então refletirá quaisquer parâmetros enviados:
+
+```
+curl -X POST -F 'name=abc' -F 'id=123' http://localhost:8080/spring-mvc-basics/api/foos
+----
+Parameters are {[name=abc], [id=123]}
+```
+
+### 7. Mapeando um Parâmetro Multivalor
+
+Um *único `@RequestParam`* pode ter vários valores:
+
+```java
+@GetMapping("/api/foos")
+@ResponseBody
+public String getFoos(@RequestParam List<String> id) {
+    return "IDs are " + id;
+}
+```
+
+*E o **Spring MVC** mapeará um parâmetro `id` delimitado por vírgulas:*
+
+```
+http://localhost:8080/spring-mvc-basics/api/foos?id=1,2,3
+----
+IDs are [1,2,3]
+```
+
+**ou uma lista de parâmetros de `id`** separados:
+
+```
+http://localhost:8080/spring-mvc-basics/api/foos?id=1&id=2
+----
+IDs are [1,2]
+```
+
+### Fonte:
+
+- Artigo: [Spring @RequestParam Annotation](https://www.baeldung.com/spring-request-param)
