@@ -1560,3 +1560,7 @@ public void givenUrl_whenPostRequest_thenFindPostResponse() throws Exception {
 **Da mesma forma, criamos o restante dos casos de teste par testar todos os métodos `HTTP`.**
 
 Como alternativa, podemos sempre usar quaisquer *cliente `REST` comum*, por exemplo, *PostMan*, *RESTClient* etc., par testar nossa aplicação. Nesse caso, precisamos ter um pouco de cuidado ao escolher o tipo de *método `HTTP`* correto ao usar o *cliente `REST`*. Caso contrário, ele retornaria o *status de erro **405***.
+
+### Fonte:
+
+- Artigo: [Spring @RequestMapping New Shortcut Annotations](https://www.baeldung.com/spring-new-requestmapping-shortcuts)
