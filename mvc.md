@@ -1100,3 +1100,65 @@ ID: ${id}
 ### Fonte:
 
 - Artigo: [Spring MVC and the @ModelAttribute Annotation](https://www.baeldung.com/spring-mvc-and-the-modelattribute-annotation)
+
+## As Anotações Spring `@Controller` e `@RestController`
+
+### 1. Visão Geral
+
+Neste artigo, discutiremos a diferença entre as anotações `@Controller` e `@RestController` no *Spring MVC*.
+
+Podemos usar a primeira anotação para *controladores* *Spring* tradicionais, e ela faz parte do framework há muito tempo.
+
+O **Spring 4.0** introduziu a anotação `@RestController` para simplificar a *criação de serviços web `RESTful`*. **É uma anotação conveniente que combina `@Controller` e `@ResponseBody`**, eliminando a necessidade de anotar todos os métodos de tratamento de solicitações da classe `controller` com a anotação `@ResponseBody`.
+
+### 2. *Spring MVC* `@Controller`
+
+Podemos anotar `controllers` clássicos com a anotação `@Controller`. Esta é simplesmente uma especialização da classe `@Component`, que nos permite detectar automaticamente classes de implementação por meio de escaneamento do `classpath`.
+
+Normalmente usamos `@Controller` em combinação com uma anotação `@RequestMapping` para métodos de tratamento de solicitações.
+
+Vamos ver um exemplo rápiudo do `controller` *Spring MVC*:
+
+```java
+@Controller
+@RequestMapping("books")
+public class SimpleBookController {
+    @GetMapping("/{id}", produces = "application/json")
+    public @ResponseBody Book getBook(@PathVariable int id) {
+        return findBookById(id);
+    }
+
+    private Book findBookById(int id) {
+        // ...
+    }
+}
+```
+
+Anotamos o método de tratamento de solicitações com `@ResponseBody`. Essa anotação permite a serialização automática do objeto de retorno no `HttpResponse`.
+
+### 3. *Spring MVC* `@RestController`
+
+`@RestController` é uma versão especializada de `controller`. Inclui as anotações `@Controller` e `@ResponseBody` e, como resultado, simplifica a implementação de `controller`.
+
+```java
+@RestController
+@RequestMapping("books-rest")
+public class SimpleBookRestController {
+    @GetMapping("/{id}", produces = "application/json")
+    public Book getBook(@PathVariable int id) {
+        return findBookById(id);
+    }
+
+    private Book findBookById(int id) {
+        // ...
+    }
+}
+```
+
+*O `controller` é anotado com a anotação `@RestController`; portanto, o `@ResponseBody` não é necessário.*
+
+Cada método de tratamento de solicitação da classe do `controller` serializa automaticamente os objetos de retorno em `HttpResponse`.
+
+### Fonte:
+
+- Artigo: [The Spring @Controller and @RestController](https://www.baeldung.com/spring-controller-vs-restcontroller)
