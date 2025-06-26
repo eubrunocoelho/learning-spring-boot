@@ -433,3 +433,298 @@ public class AuthApi {
 ```
 
 Aqui verificamos as credenciais fornecidas usando o gerenciador de autenticação e, em caso de sucesso, geramos o *token `JWT`* e o retornamos com um cabeçalho `HTTP` de resposta junto com as informações de identidade do usuário no corpo da resposta.
+
+## Autorização `JWT` com *Spring Security*
+
+Na seção anterior, configuramos um processo de autenticação *Spring `JWT`* e configuramos `URLs` públicas/privadas. Isso pode ser suficiente para aplicações simples, mas para a maioria dos casos de uso reais, sempre precisamos de políticas de acesso baseadas em funções para nossos usuários. Neste capítulo, abordaremos essa questão e configuraremos um esquema de autorização baseado em funções usando o framework *Spring Security*.
+
+Em nosso aplicativo de exemplo, definimos as três funções a seguir:
+
+- `USER_ADMIN` nos permite gerenciar usuários do aplicativo.
+- `AUTHOR_ADMIN` nos permite gerenciar autores.
+- `BOOK_ADMIN` nos permite gerenciar livros.
+
+Agora, precisamos aplicá-los às `URLs` correspondentes:
+
+- `api/public` é acessível publicamente.
+- `api/admin/user` usuários com a função `USER_ADMIN` podem acessar.
+- `api/author` usuários com a função `AUTHOR_ADMIN` podem acessar.
+- `api/book` usuários com a função `BOOK_ADMIN` podem acessar.
+
+O framework *Spring Security* nos fornece duas opções para configurar o esquema de autorização:
+
+- Configuração baseada em `URL`.
+- Configuração baseada em anotação.
+
+Primeiro, vamos ver como funciona a configuração baseada em `URL`. Ela pode ser aplicada à configuração de segurança da web da seguinte forma:
+
+```java
+@EnableWebSecurity
+public class SecurityConfig extends WebSecurityConfigurerAdapater {
+    // Details omitted for brevety
+    
+    @Override
+    protected void configure(HttpSecurity http) throws Exception {
+        // Enable CORS and disable CSRF
+        http = http.cors().and().csrf().disable()
+
+        // Set session management to stateless
+        http = http
+            .sessionManagement()
+            .sessionCreationPolicy(SessionCreationPolicy.SATELESS)
+            .and();
+
+        // Set unauthorized request exception handler
+        http = http
+            .exceptionHandling()
+            .authenticationEntryPoint(
+                (request, response, ex) -> {
+                    response.sendError(
+                        HttpServletResponse.SC_UNAUTHORIZED,
+                        ex.getMessage()
+                    );
+                }
+            )
+            .and();
+
+        // Set permission on endpoints
+        http.authorizeRequests()
+            // Our public endpoints
+            .antMatchers("api/public/**").permitAll()
+            .antMatchers(HttpMethod.GET, "/api/author/**").permitAll()
+            .antMatchers(HttpMethod.POST, "/api/author/search").permitAll()
+            .antMatchers(HttpMethod.GET, "/api/book/**").permitAll()
+            .antMatchers(HttpMethod.POST, "/api/book/search").permitAll()
+            // Our private endpints
+            .antMatchers("/api/admin/user/**").hasRole(Role.USER_ADMIN)
+            .antMatchers("/api/author/**").hasRole(Role.AUTHOR_ADMIN)
+            .antMatchers("/api/book/**").hasRole(Role.BOOK_ADMIN)
+            .anyRequest().authenticated();
+        
+        // Add JWT token filter
+        http.addFilterBefore(
+            jwtTokenFilter,
+            UsernamePasswordAuthenticationFilter.class
+        );
+    }
+
+    // Details omitted for brevity
+}
+```
+
+Como você pode ver, essa abordagem é simples e direta, mas tem uma desvantagem. O esquema de autorização em nossa aplicação pode ser complexo e, se definirmos todas as regras em um único lugar, ele se tornará muito grande, complexo e difícil de ler. Por isso, geralmente prefiro usar a configuração baseada em anotações.
+
+O framework *Spring Security* define as seguintes anotações para segurança web.
+
+- `@PreAuthorize` suporta *[Spring Expression Language](https://www.baeldung.com/spring-expression-language)* e é usado para fornecer controle de acesso baseado em expressão *antes de executar* o método.
+- `@PostAuthorize` suporta *[Spring Expression Language](https://www.baeldung.com/spring-expression-language)* e é usado para fornecer o controle de acesso baseado em expressão *após a execução do método* *(fornece a capacidade de acessar o resultado do método)*.
+- `@PreFilter` suporta [Spring Expression Language](https://www.baeldung.com/spring-expression-language) e é usado para fltrar a coleção ou matrizes *antes de executar o método* com base em regras de segurança personalizadas que definimos.
+- `POstFilter` suporta [Spring Expression Language](https://www.baeldung.com/spring-expression-language) e é usado para filtrar a coleção ou matrizes retornados *após executar o método* com base em regras de segurança personalizadas que definimos *(fornecemos a capacidade de acessar o resultado do método)*.
+- `@Secured` não suporta [Spring Expression Language](https://www.baeldung.com/spring-expression-language) e é usado para especificar uma lista de funções em um método.
+- `@RolesAllowed` não oforece suporta à [Spring Expression Language](https://www.baeldung.com/spring-expression-language) e é a anotação equivamente de `@Secured` do [**JSR 250**](https://en.wikipedia.org/wiki/JSR_250).
+
+Essas anotações são desabilitadas por padrão e podem ser habilitadas em nosso aplicativo da seguinte forma:
+
+```java
+@EnableWebSecurity
+@EnableGlobalMethodSecurity(
+    securedEnabled = true,
+    jsr250Enabled = true,
+    prePostEnabled = true
+)
+public class SecurityConfig extends WebSecurityConfigurerAdapter {
+    // Details omitted for brevity
+}
+```
+
+- `securedEnabled = true` habilita a anotação `@Secured`.
+- `jsr250Enabled = true` habilita a anotação `@RolesAllowed`.
+- `prePostEnabled = true` habilita anotações `@PreAuthorize`, `@PostAuthorize`, `@PreFilter`, `@PostFilter`.
+
+Depois de habilitá-los, podemos aplicar políticas de acesso baseados em funções em nossos `endpoints` de `API` como esta:
+
+```java
+@Api(tags = "UserAdmin")
+@RestController @RequestMapping(path = "api/admin/user")
+@RolesAllowed(Role.USER_ADMIN)
+public class UserAdminApi {
+    // Details omitted for brevity
+}
+
+@Api(tags = "Author")
+@RestController @RequestMapping(path = "api/author")
+public class AuthorApi {
+    // Details omitted for brevity
+
+    @RolesAllowed(Role.AUTHOR_ADMIN)
+    @PostMapping
+    public void create() {}
+
+    @RolesAllowed(Role.AUTHOR_ADMIN)
+    @PutMapping("{id}")
+    public void edit() {}
+
+    @RolesAllowed(Role.AUTHOR_ADMIN)
+    @DeleteMapping("{id}")
+    public void delete() {}
+
+    @GetMapping("{id}")
+    public void get() {}
+
+    @GetMapping("{id}/book")
+    public void getBooks() {}
+
+    @PostMapping("search")
+    public void search() {}
+}
+
+@Api(tags = "Book")
+@RestController @RequestMapping(path = "api/book")
+public class BookAapi {
+    // Details omitted for brevity
+    @RolesAllowed(Role.BOOK_ADMIN)
+    @PostMapping
+    public BookView create() {}
+
+    @RolesAllowed(Role.BOOK_ADMIN)
+    @PutMapping("{id}")
+    public void edit() {}
+
+    @RolesAllowed(Role.BOOK_ADMIN)
+    @DeleteMapping("{id}")
+    public void delete() {}
+
+    @GetMapping("{id}")
+    public void get() {}
+
+    @GetMapping("{id}/author")
+    public void getAuthors() {}
+
+    @PostMapping("search")
+    public void search() {}
+}
+```
+
+*Observe que as anotações de segurança podem ser fornecidas tanto no nível de classe quanto no nível do método.*
+
+Os exemplo demonstrados são simples e nãpop representam cenários do mundo real, mas o *Spring Security* fornece um rico conjunto de anotações, e você pode manipular um esquema de autorização complexo se optar por usá-las.
+
+### Nome da Função com Prefixo Padrão
+
+Nesta subseção separada, quero enfatizar mais um detalhe sutil que confunde muitos usuários novos.
+
+O framework *Spring Security* diferencia dois termos:
+
+- *`Authority` representa uma permissão individual.*
+- *`Role` representa um grupo de permissões.*
+
+Ambos podem ser representados com uma única interface chamada `GrantedAuthority` e posteriormente verificada com *Spring Expression Language* dentro das anotações do *Spring Security*, da seguinte forma:
+
+- `Authority`: `@PreAuthorize("hasAuthority('EDIT_BOOK')")`.
+- `Role`: `@PreAuthorize("hasRole('BOOK_ADMIN')")`.
+
+Para tornar a diferença entre esses dois termos mais explícita, o framework *Spring Security* adiciona um prefixo `ROLE_` ao *nome da função padrão*. Assim, em vez de verificar se há uma função chamada `BOOK_ADMIN`, ele verificará se há `ROLE_BOOK_ADMIN`.
+
+Pessoalmente, acho esse comportamento confuso e prefiro desabilitá-lo em meus aplicativos. Ele pode ser desabilitado na configuração do *Spring Security* da seguinte forma:
+
+```java
+@EnableWebSecurity
+public class SecurityConfig extends WebSecurityConfigurerAdapater {
+    // Details omitted for brevity
+
+    @Bean
+    GrantedAuthorityDefaults grantedAuthorityDefaults() {
+        return new GrantedAuthorityDefaults(""); // Romove the ROLE_ prefix
+    }
+}
+```
+
+## Testando nossa Solução *Spring Security* `JWT`
+
+Para testar nossos `endpoints` com *testes unitários* ou de *integração* ao usar o framework *Spring Security*, precisamos adicionar `spring-security-test` a depndência junto com o `spring-boot-starter-test`. Nosso arquivo de build `pom.xml` ficará assim:
+
+```xml
+<dependency>
+    <groupId>org.springframework.boot</groupId>
+    <artifactId>spring-boot-starter-test</artifactId>
+    <scope>test</scope>
+    <exclusions>
+        <exclusion>
+            <groupId>org.junit.vintage</groupId>
+            <artifactId>junit-vintage-engine</artifactId>
+        </exclusion>
+    </exclusions>
+</dependency>
+
+<dependency>
+    <groupId>org.springframework.security</groupId>
+    <artifactId>spring-security-test</artifactId>
+    <scope>test</scope>
+</dependency>
+```
+
+Essa dependência nos dá acesso a algumas anotações que podem ser usadas para adicionar contexto de segurança às nossas funções de teste.
+
+Essas anotações são:
+
+- `@WithMockUser` pode ser adicionado a um método de teste para emular a execução com um usuário simulado.
+- `@WithUserDetails` pode ser adicionado a um método de teste para emular a execução com `UserDetails` retornado do `UserDetailsService`.
+- `@WithAnonymousUser` pode ser adicionado a um método de teste para emular a execução com um usuário anônimo. Isso é útil quando um usuário deseja executar a maioria dos testes como um usuário específico e substituir alguns métodos para que sejam anônimos.
+- `@WithSecurityContext` determina qual `SecurityContext` usar, e todas as três anotações descritas acima são baseadas nela. Se tivermos um caso de uso específico, podemos criar nossa própria anotação que usa `@WithSecurityContext` para criar qualquer `SecurityContext` que desejarmos. A discussão sobre isso está fora do escopo do nosso artigo do *Spring Security*, e consulte a documentação do *Spring Security* para mais detalhes.
+
+A maneira mais fácil de executar os testes com um usuário específico é usar a anotação `@WithMockUser`. Podemos criar um usuário fictício com ela e executar o teste da seguinte maneira:
+
+```java
+@Test @WithMockUser(username="customUsername@example.io", roles={"USER_ADMIN"})
+public void test() {
+    // Details omitted for brevity
+}
+```
+
+Essa abordagem tem algumas desvantagens. Primeiro, o usuário simulado não existe e, se você executar o teste de integração, que posteriormente consulta as informações do usuário no banco de dados, o teste falhará. Segundo, o usuário simulado é a instância da classe `org.springframework.security.core.userdetails.User`, que é a implementação interna da interface `UserDetails` no framework *Spring*, e se tivermos nossa própria implemnetação, isso pode causar conflitos posteriormente, *durante a execução do teste*.
+
+Se as desvantagens anteriores forem um obstáculo para nossa aplicação, a anotação `@WithUserDetails` é a solução. Ela é usada quando temos implementações personalizadas de `UserDetails` e `UserDetailsService`. Ela pressupõe que o usuário existe, então precisamos criar a linha real no banco de dados ou fornecer a instância simulada de `UserDetailsService` antes de executar os testes.
+
+É assim que podemos usar esta anotação:
+
+```java
+@Test @WithUserDetails("customUsername@example.io")
+public void test() {
+    // Details omitted for brevity
+}
+```
+
+Esta é uma anotação preferencial nos testes de integração do nosso projeto de exemplo, porque temos implementações personalizadas das interfaces mencionadas acima.
+
+O uso de `@WithAnonymousUser` permite a execução como um usuário anônimo. Isso é especialmente conveniente quando você deseja executar a maioria dos testes com um usuário específico, mas alguns testes como um usuário anônimo. POr exemplo, o seguinte teste executará os casos de teste `test1` e `test2` com um usuário simulado e `test3` com um usuário anônimo.
+
+```java
+@SpringBootTest
+@AutoConfigureMockMvc
+@WithMockUser
+public class WithUserClassLevelAuthenticationTests {
+    @Test
+    public void test1() {
+        // Details omitted for brevity
+    }
+
+    @Test
+    public void test2() {
+        // Details omitted for brevity
+    }
+
+    @Test @WithAnonymousUser
+    public void test3() throws Exception {
+        // Details omitted for brevity
+    }
+}
+```
+
+## Conquistanto a Curva de Aprendizado do *Spring Security `JWT`*
+
+Por fim, gostaria de mencionar que o framework *Spring Security* provavelmente não vencera nenhum concurso de beleza e, definitivamente, tem uma curva de aprendizado íngreme. Já me deparei com muitas situações em que ele foi substituído por alguma solução interna devido à sua complexidade de configuração inicial. Mas, depois que os desenvolvedores entendem seus detalhes internos e conseguem definir a configuração inicial, ele se torna relativamente simples de usar.
+
+## Fonte:
+
+- Autor: [Ioram Gordadze](https://www.toptal.com/resume/ioram-gordadze)
+- Artigo: [Spring Security JWT Tutorial](https://www.toptal.com/spring/spring-security-tutorial)
